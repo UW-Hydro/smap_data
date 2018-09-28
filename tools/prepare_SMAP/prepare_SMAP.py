@@ -103,16 +103,16 @@ else:
     smap_times_pm = da_smap['time'].values[smap_times_pm_ind]
 
     # --- Flip lat of SMAP da to be ascending --- #
-    lat_flipped = np.flip(da_smap['lat'].values)
-    soil_moisture_flipped = np.flip(da_smap['soil_moisture'], axis=1)
-    retrieval_qual_flag_flipped = np.flip(da_smap['retrieval_qual_flag'], axis=1)
-    da_smap['lat'] = lat_flipped
-    da_smap['soil_moisture'] = soil_moisture_flipped
-    da_smap['retrieval_qual_flag'] = retrieval_qual_flag_flipped
-
-    # --- Save processed SMAP data to file --- #
     ds_smap = xr.Dataset({'soil_moisture': da_smap,
                           'retrieval_qual_flag': da_flag})
+    lat_flipped = np.flip(ds_smap['lat'].values)
+    soil_moisture_flipped = np.flip(ds_smap['soil_moisture'], axis=1)
+    retrieval_qual_flag_flipped = np.flip(ds_smap['retrieval_qual_flag'], axis=1)
+    ds_smap['lat'] = lat_flipped
+    ds_smap['soil_moisture'] = soil_moisture_flipped
+    ds_smap['retrieval_qual_flag'] = retrieval_qual_flag_flipped
+
+    # --- Save processed SMAP data to file --- #
     ds_smap.to_netcdf(
         os.path.join(output_subdir_data,
                      'soil_moisture.{}_{}.nc'.format(
