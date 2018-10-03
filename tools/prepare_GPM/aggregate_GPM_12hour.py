@@ -57,7 +57,6 @@ times_12h = pd.date_range(
 da_domain = xr.open_dataset(cfg['DOMAIN']['domain_nc'])['mask']
 lonlon, latlat = np.meshgrid(da_domain['lon'].values, da_domain['lat'].values)
 
-list_12h_alltime = []
 # --- Loop over each 12-hour LST interval --- #
 for time_12h in times_12h:
     print(time_12h)  # Time-beginning timestamp

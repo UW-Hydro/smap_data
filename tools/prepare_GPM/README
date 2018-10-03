@@ -4,5 +4,5 @@ Steps of preparing GPM data:
 
 2. process_from_raw_GPM.remap.py - process the raw downloaded GPM files to SMAP grid; output 30min, 36-km GPM files, one file per 30 min
 
-3. aggregate_GPM_12hour.py - aggregate 30 min, 36 kim GPM to 12-hour (SMAP resolution), 36 km
+3. aggregate_GPM_12hour.py - aggregate 30 min, 36 kim GPM to 12-hour (SMAP local solar time intervals), 36 km
 
