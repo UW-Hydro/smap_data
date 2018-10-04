@@ -150,3 +150,41 @@ def rescale_SMAP_PM2AM_ts(ts_AM, ts_PM, dict_window_time_indices):
         index=ts_PM.index)
     return ts_PM_rescaled
 
+
+def rescale_SMAP_PM2AM_ts_wrap(run_pixel, lat_ind, lon_ind, ts_AM, ts_PM, dict_window_time_indices):
+    ''' Wrapping function for parallelizing - Rescale a ts of PM SMAP to AM using seasonal CDF matching
+    
+    Parameters
+    ----------
+    run_pixel: <int>
+        1 for running this pixel; 0 for not running this pixel (due to out-of-domain)
+    lat_ind: <int>
+        Index of lat; for printing purpose only
+    lon_ind: <int>
+        Index of lon; for printing purpose only
+    ts_AM: <pd.Series>
+        SMAP AM ts
+    ts_PM: <pd.Series>
+        SMAP PM ts
+    dict_window_time_indices: <dict>
+        Dict of all times in a 91-day-of-all-years window
+        key: input time
+        value: an array of all timestamps in the window from all years
+    
+    Returns
+    ----------
+    PM_rescaled: <np.array>
+        Rescaled SMAP PM ts (value only)
+    '''
+
+    if run_pixel == 1:
+        print(lat_ind, lon_ind)
+        ts_PM_rescaled = rescale_SMAP_PM2AM_ts(ts_AM, ts_PM, dict_window_time_indices)
+    else:
+        print(lat_ind, lon_ind, 'skip')
+        ts_PM_rescaled = ts_PM
+        ts_PM_rescaled[:] = np.nan
+    PM_rescaled = ts_PM_rescaled.values
+
+    return PM_rescaled
+

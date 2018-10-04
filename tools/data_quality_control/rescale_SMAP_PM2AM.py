@@ -4,16 +4,24 @@
 #   2) takes care the SMAP AM & PM systematic bias
 #       Specifically, remap SMAP PM data to AM regime using seasonal CDF matching
 
+import sys
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats
 import pandas as pd
 import os
+from joblib import Parallel, delayed
 import timeit
 
 from utils import (calculate_ecdf_percentile, construct_seasonal_window_time_indices,
-                   rescale_SMAP_PM2AM_ts, setup_output_dirs)
+                   rescale_SMAP_PM2AM_ts, setup_output_dirs, rescale_SMAP_PM2AM_ts_wrap)
+
+
+# ========================================== #
+# Read command line arguments
+# ========================================== #
+nproc = int(sys.argv[1])
 
 
 # ========================================== #
@@ -40,7 +48,7 @@ da_smap = ds_smap['soil_moisture']
 da_domain = xr.open_dataset(domain_nc)['mask']
 # Extract dates - for output naming purpose
 start_time = pd.to_datetime(da_smap['time'].values[0])
-end_timd = pd.to_datetime(da_smap['time'].values[-1])
+end_time = pd.to_datetime(da_smap['time'].values[-1])
 
 
 # ========================================== #
@@ -49,23 +57,23 @@ end_timd = pd.to_datetime(da_smap['time'].values[-1])
 output_dir = setup_output_dirs(output_basedir, mkdirs=['data'])['data']
 
 
-# ========================================== #
-# Exclude SMAP pixels with constant values
-# ========================================== #
-print('Excluding SMAP pixels with constant values...')
-# --- Find bad pixels --- #
-da_bad_smap_pixels = (da_smap.std(dim='time')==0)
-# --- Set SMAP value to all NANs for these pixels --- #
-smap = da_smap.values
-bad_smap_pixels = da_bad_smap_pixels.values
-smap[:, bad_smap_pixels] = np.nan
-da_smap[:] = smap
+## ========================================== #
+## Exclude SMAP pixels with constant values
+## ========================================== #
+#print('Excluding SMAP pixels with constant values...')
+## --- Find bad pixels --- #
+#da_bad_smap_pixels = (da_smap.std(dim='time')==0)
+## --- Set SMAP value to all NANs for these pixels --- #
+#smap = da_smap.values
+#bad_smap_pixels = da_bad_smap_pixels.values
+#smap[:, bad_smap_pixels] = np.nan
+#da_smap[:] = smap
 
 
 # ========================================== #
 # Seasonal rescaling PM to AM - seasonal CDF matching
 # ========================================== #
-print('Seasonal rescaling PM AM...')
+print('Seasonal rescaling PM to AM...')
 # --- Construct seasonal windows for CDF mapping --- #
 times = pd.to_datetime(da_smap['time'].values)
 dict_window_time_indices = construct_seasonal_window_time_indices(times)
@@ -78,26 +86,27 @@ for hour, item in da_smap.groupby('time.hour'):
         da_PM = item
 
 # --- Rescale for each pixel --- #
-da_smap_new = da_smap.copy(deep=True)
-for lat_ind in range(len(da_domain['lat'])):
-    for lon_ind in range(len(da_domain['lon'])):
-        print(lat_ind, lon_ind)
-        # --- Skip invalid pixels --- #
-        if da_domain[lat_ind, lon_ind].values == 0:
-            continue
-        # --- Rescale PM data --- #
-        ts_AM = da_AM[:, lat_ind, lon_ind].to_series()
-        ts_PM = da_PM[:, lat_ind, lon_ind].to_series()
-        ts_PM_rescaled = rescale_SMAP_PM2AM_ts(
-            ts_AM, ts_PM, dict_window_time_indices)
-        # --- Reconstruct ts --- #
-        ts = da_smap[:, lat_ind, lon_ind].to_series()
-        ts[ts_PM.index] = ts_PM_rescaled
-        # --- Put back in da_smap --- #
-        da_smap_new[:, lat_ind, lon_ind][:] = ts
+#da_smap_new = da_smap.copy(deep=True)
+results = Parallel(n_jobs=nproc)(delayed(rescale_SMAP_PM2AM_ts_wrap)(
+    int(da_domain[lat_ind, lon_ind].values),
+    lat_ind,
+    lon_ind,
+    da_AM[:, lat_ind, lon_ind].to_series(),
+    da_PM[:, lat_ind, lon_ind].to_series(),
+    dict_window_time_indices)
+    for lat_ind in range(len(da_domain['lat']))
+    for lon_ind in range(len(da_domain['lon'])))
+#    for lat_ind in range(150, 160)
+#    for lon_ind in range(330, 341))
+
+# --- Put rescaled PM back in da_smap --- #
+results = np.asarray(results)  # [lat*lon, time_PM]
+results = results.reshape([len(da_domain['lat']), len(da_domain['lon']), -1])  # [lat, lon, time_PM]
+results = np.rollaxis(results, 2, 0)  # [time_PM, lat, lon]
+da_smap.loc[da_PM['time'], :, :] = results
 
 # --- Save new SMAP data to file --- #
-ds_smap_new = xr.Dataset({'soil_moisture': da_smap_new})
+ds_smap_new = xr.Dataset({'soil_moisture': da_smap})
 ds_smap_new.to_netcdf(
     os.path.join(output_dir,
                  'smap.PM_rescaled.{}_{}.nc'.format(
