@@ -135,7 +135,7 @@ def rescale_SMAP_PM2AM_ts(ts_AM, ts_PM, dict_window_time_indices):
     ts_PM_rescaled: <pd.Series>
         Rescaled SMAP PM ts
     '''
-    
+
     array_rescaled = np.asarray(
         [scipy.stats.mstats.mquantiles(
             ts_AM[dict_window_time_indices[t]].dropna(),
@@ -183,8 +183,63 @@ def rescale_SMAP_PM2AM_ts_wrap(run_pixel, lat_ind, lon_ind, ts_AM, ts_PM, dict_w
     else:
         print(lat_ind, lon_ind, 'skip')
         ts_PM_rescaled = ts_PM
-        ts_PM_rescaled[:] = np.nan
     PM_rescaled = ts_PM_rescaled.values
 
     return PM_rescaled
+
+
+def rescale_SMAP_PM2AM_chunk_wrap(lon_ind_start, lon_ind_end,
+                                  da_domain_chunk, da_AM_chunk, da_PM_chunk,
+                                  dict_window_time_indices):
+    ''' Wrapping function for running a whole longitude chunk of pixels
+        - Rescale a ts of PM SMAP to AM using seasonal CDF matching
+    
+    Parameters
+    ----------
+    lon_ind_start: <int>
+        Index of the starting lon; for printing purpose only
+    lon_ind_end: <int>
+        Index of the ending lon; for printing purpose only
+    da_domain_chunk: <xr.DataArray>
+        Domain mask for the chunk; 1 for active pixel; 0 for inactive pixel (will skip computation)
+    da_AM_chunk: <xr.DataArray>
+        SMAP AM da for the chunk only; must be the same size as da_domain_chunk
+    da_PM_chunk: <xr.DataArray>
+        SMAP PM da for the chunk only;  must be the same size as da_domain_chunk
+    dict_window_time_indices: <dict>
+        Dict of all times in a 91-day-of-all-years window
+        key: input time
+        value: an array of all timestamps in the window from all years
+    
+    Returns
+    ----------
+    PM_rescaled_chunk: <np.array>
+        Rescaled SMAP PM da for the chunk (value only)
+        Dimension: [time_PM, lat, lon_chunk]
+    '''
+
+    # Print out longitude chunk
+    print('Running for chunk lon_ind from {} to {}'.format(lon_ind_start, lon_ind_end))
+
+    # Excecute
+    PM_rescaled_chunk = \
+        [rescale_SMAP_PM2AM_ts_wrap(
+            int(da_domain_chunk[lat_ind, lon_ind].values),
+            lat_ind,
+            lon_ind_start + lon_ind,  # this is only for printing purpose
+            da_AM_chunk[:, lat_ind, lon_ind].to_series(),
+            da_PM_chunk[:, lat_ind, lon_ind].to_series(),
+            dict_window_time_indices)
+        for lat_ind in range(len(da_AM_chunk['lat']))
+        for lon_ind in range(len(da_AM_chunk['lon']))]
+
+    # Reshape the chunk results
+    PM_rescaled_chunk = np.asarray(PM_rescaled_chunk)  # [lat*lon_chunk, time_PM]
+    PM_rescaled_chunk = PM_rescaled_chunk.reshape(
+        [len(da_domain_chunk['lat']),
+         len(da_domain_chunk['lon']),
+         -1])  # [lat, lon_chunk, time_PM]
+    PM_rescaled_chunk = np.rollaxis(PM_rescaled_chunk, 2, 0)  # [time_PM, lat, lon_chunk]
+
+    return PM_rescaled_chunk
 
