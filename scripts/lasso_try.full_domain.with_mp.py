@@ -41,7 +41,7 @@ ds_prec.load()
 ds_prec.close()
 
 # Output dir
-output_dir = '/civil/hydro/ymao/smap_data/output/lasso_try'
+output_dir = '/civil/hydro/ymao/smap_data/output/lasso_try/standardize_X'
 
 
 # ========================================= #
@@ -59,12 +59,17 @@ if nproc == 1:
             ts_smap = ds_smap['soil_moisture'][:, lat_ind, lon_ind].to_series()
             # Extract GPM ts
             ts_prec = ds_prec['PREC'][:, lat_ind, lon_ind].to_series()
+            # --- Skip invalid pixels --- #
             # Skip no-data pixels
             if ts_smap.isnull().all() or ts_prec.isnull().all():
                 continue
-            # Run Lasso
+            # Skip pixels with constant SMAP values
+            if ts_smap.std() == 0:
+                print('Constant SMAP values for pixel {} {} - discard!'.format(lat_ind, lon_ind))
+                continue
+            # --- Run Lasso --- #
             result = lasso_time_series(
-                ts_smap, ts_prec, lat_ind)
+                lat_ind, lon_ind, ts_smap, ts_prec, lasso_alpha, standardize=True)
             # Skip pixels with invalid model fitting
             if result[0] is None:
                 continue
@@ -90,13 +95,18 @@ elif nproc > 1:
             ts_smap = ds_smap['soil_moisture'][:, lat_ind, lon_ind].to_series()
             # Extract GPM ts
             ts_prec = ds_prec['PREC'][:, lat_ind, lon_ind].to_series()
+            # --- Skip invalid pixels --- #
             # Skip no-data pixels
             if ts_smap.isnull().all() or ts_prec.isnull().all():
                 continue
-            # Run Lasso
+            # Skip pixels with constant SMAP values
+            if ts_smap.std() == 0:
+                print('Constant SMAP values for pixel {} {} - discard!'.format(lat_ind, lon_ind))
+                continue
+            # --- Run Lasso --- #
             results['{}_{}'.format(lat_ind, lon_ind)] = pool.apply_async(
                 lasso_time_series,
-                (ts_smap, ts_prec, lasso_alpha))
+                (lat_ind, lon_ind, ts_smap, ts_prec, lasso_alpha, True))
     # Finish multiprocessing
     pool.close()
     pool.join()

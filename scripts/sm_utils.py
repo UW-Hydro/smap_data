@@ -48,12 +48,16 @@ def lasso_time_series_wrap(ds_smap, ds_prec, lat_ind, lon_ind, lasso_alpha):
         return model, X, Y, times, resid
 
 
-def lasso_time_series(ts_smap, ts_prec, lasso_alpha, standardize=False):
+def lasso_time_series(lat_ind, lon_ind, ts_smap, ts_prec, lasso_alpha, standardize=False):
     ''' Lasso regression on a time series of SMAP and GPM
     data for one pixel
     
     Parameters
     ----------
+    lat_ind: <ind>
+        zero-starting lat index - for printing purpose only
+    lon_ind: <ind>
+        zero-starting lon index - for printing purpose only
     ts_smap: <pd.Series>
         SMAP time series (with NAN)
     ts_prec: <pd.Series>
@@ -61,7 +65,7 @@ def lasso_time_series(ts_smap, ts_prec, lasso_alpha, standardize=False):
     lasso_alpha: <float>
         alpha paramter in Lasso fitting
     standardize: <bool>
-        Whether to standardize X; default: False
+        Whether to standardize X and center Y; default: False
 
     Returns
     ----------
@@ -117,15 +121,18 @@ def lasso_time_series(ts_smap, ts_prec, lasso_alpha, standardize=False):
     X = np.asarray(X)
     times = pd.to_datetime(times)
 
-    # --- If there are <= 3 data points, discard this cell --- #
-    if len(Y) <= 3:
-        print('Too few valid data points, discard this pixel')
+    # --- If there are <= 10 data points, discard this cell --- #
+    if len(Y) <= 10:
+        print('Too few valid data points for pixel {} {} - discard!'.format(lat_ind, lon_ind))
         return None, None, None, None, None
 
-    # --- Standardize X --- #
+    np.std(X, axis=0)
+
+    # --- Standardize X and center Y --- #
     if standardize is True:
         X = X - np.mean(X, axis=0)
         X = X / np.std(X, axis=0)
+        Y = Y - np.mean(Y)
 
     # --- Lasso regression --- #
     # Prepare Lasso regressor
