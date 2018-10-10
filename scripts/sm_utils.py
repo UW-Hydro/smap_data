@@ -12,6 +12,7 @@ import numpy as np
 from sklearn import linear_model
 from sklearn.metrics import r2_score
 import pickle
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 
 
 def regression_time_series_wrap(run_pixel, lat_ind, lon_ind, ts_smap, ts_prec,
@@ -242,6 +243,17 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     return dict_results_ts
 
 
-
+def add_gridlines(axis,
+                  xlocs=[-150, -100, -50, 0,
+                         50, 100, 150],
+                  ylocs=[-80, -60, -40, -20, 0, 20, 40, 60, 80],
+                  alpha=1):
+    gl = axis.gridlines(draw_labels=True, xlocs=xlocs, ylocs=ylocs,
+                        alpha=alpha)
+    gl.xlabels_top = False
+    gl.ylabels_right = False
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    return gl
 
 
