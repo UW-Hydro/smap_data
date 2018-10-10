@@ -97,17 +97,33 @@ file_basename = 'results.X_{}.{}.{}.{}'.format(
 with open(os.path.join(output_dir, '{}pickle'.format(file_basename)), 'wb') as f:
     pickle.dump(dict_results, f)
 
+# --- Extract n_coef --- #
+for latlon_ind, item in dict_results.items():
+    lat_ind = int(latlon_ind.split('_')[0])
+    lon_ind = int(latlon_ind.split('_')[1])
+    # Extract fitted coef
+    fitted_coef = item['model'].coef_
+    n_coef = len(fitted_coef)
+    break
+
 # --- Save results to file --- #
 print('Saving results to file...')
 f = open(os.path.join(output_dir, '{}txt'.format(file_basename)), 'w')
-f.write('lat\tlon\tcoef1\tcoef2\n')
+# Write header line
+f.write('lat\t\tlon\t\t')
+for i in range(n_coef):
+    f.write('coef{}\t'.format(i+1))
+f.write('\n')
+# Write results
 for lat_ind in range(len(da_domain['lat'])):
     for lon_ind in range(len(da_domain['lon'])):
         if '{}_{}'.format(lat_ind, lon_ind) in dict_results.keys():
             model = dict_results['{}_{}'.format(lat_ind, lon_ind)]['model']
             lat = da_domain[lat_ind, lon_ind]['lat'].values
             lon = da_domain[lat_ind, lon_ind]['lon'].values
-            f.write('{:.4f}\t{:.4f}\t{:.8f}\t{:.8f}\n'.format(
-                lat, lon, model.coef_[0], model.coef_[1]))
+            f.write('{:.4f}\t{:.4f}\t'.format(lat, lon))
+            for i in range(n_coef):
+                f.write('{:.8f}\t'.format(model.coef_[0]))
+            f.write('\n')
 f.close() 
 
