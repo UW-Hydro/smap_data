@@ -10,10 +10,12 @@ import matplotlib.pyplot as plt
 import xesmf as xe
 import numpy as np
 from sklearn import linear_model
+from sklearn.metrics import r2_score
 import pickle
 
 
-def lasso_time_series_wrap(run_pixel, lat_ind, lon_ind, ts_smap, ts_prec, lasso_alpha, standardize=True):
+def regression_time_series_wrap(run_pixel, lat_ind, lon_ind, ts_smap, ts_prec,
+                                regression_type, X_version, **kwargs):
     ''' A wrap function that extract a single pixel and perform Lasso regression
 
     Parameters
@@ -28,10 +30,9 @@ def lasso_time_series_wrap(run_pixel, lat_ind, lon_ind, ts_smap, ts_prec, lasso_
         SMAP time series (with NAN)
     ts_prec: <pd.Series>
         IMERG precipitation time series
-    lasso_alpha: <float>
-        alpha paramter in Lasso fitting
-    standardize: <bool>
-        Whether to standardize X and center Y; default: True
+    regression_type: <string>
+        Options: linear; lasso
+    X_version: <str>
 
     Returns
     ----------
@@ -41,8 +42,8 @@ def lasso_time_series_wrap(run_pixel, lat_ind, lon_ind, ts_smap, ts_prec, lasso_
 
     if run_pixel == 1:
         print(lat_ind, lon_ind)
-        dict_results_ts = lasso_time_series(
-            lat_ind, lon_ind, ts_smap, ts_prec, lasso_alpha, standardize)
+        dict_results_ts = regression_time_series(
+            lat_ind, lon_ind, ts_smap, ts_prec, regression_type, X_version, **kwargs)
     else:
         print(lat_ind, lon_ind, 'skip')
         dict_results_ts = None
@@ -50,9 +51,9 @@ def lasso_time_series_wrap(run_pixel, lat_ind, lon_ind, ts_smap, ts_prec, lasso_
     return dict_results_ts
 
 
-def lasso_time_series_chunk_wrap(lon_ind_start, lon_ind_end,
-                                 da_domain_chunk, da_smap_chunk, da_prec_chunk,
-                                 lasso_alpha, standardize=True):
+def regression_time_series_chunk_wrap(lon_ind_start, lon_ind_end,
+                                      da_domain_chunk, da_smap_chunk, da_prec_chunk,
+                                      regression_type, X_version, **kwargs):
     ''' Wrapping function for running a whole longitude chunk of pixels
         - Lasso regression of SMAP and GPM data for each pixel
     
@@ -68,10 +69,9 @@ def lasso_time_series_chunk_wrap(lon_ind_start, lon_ind_end,
         SMAP data (with NAN) for the chunk
     da_prec_chunk: <xr.DataArray>
         IMERG precipitation data for the chunk
-    lasso_alpha: <float>
-        alpha paramter in Lasso fitting
-    standardize: <bool>
-        Whether to standardize X and center Y; default: True
+    regression_type: <string>
+        Options: linear; lasso
+    X_version: <str>
 
     Returns
     ----------
@@ -84,14 +84,15 @@ def lasso_time_series_chunk_wrap(lon_ind_start, lon_ind_end,
 
     # Excecute
     results_list = \
-        [lasso_time_series_wrap(
+        [regression_time_series_wrap(
             int(da_domain_chunk[lat_ind, lon_ind].values),
             lat_ind,
             lon_ind_start + lon_ind,  # this is only for printing purpose
             da_smap_chunk[:, lat_ind, lon_ind].to_series(),
             da_prec_chunk[:, lat_ind, lon_ind].to_series(),
-            lasso_alpha,
-            standardize)
+            regression_type,
+            X_version,
+            **kwargs)
         for lat_ind in range(len(da_domain_chunk['lat']))
         for lon_ind in range(len(da_domain_chunk['lon']))]
     
@@ -108,7 +109,8 @@ def lasso_time_series_chunk_wrap(lon_ind_start, lon_ind_end,
     return dict_results_chunk
 
 
-def lasso_time_series(lat_ind, lon_ind, ts_smap, ts_prec, lasso_alpha, standardize=True):
+def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
+                           regression_type, X_version, **kwargs):
     ''' Lasso regression on a time series of SMAP and GPM data for one pixel
     
     Parameters
@@ -121,7 +123,14 @@ def lasso_time_series(lat_ind, lon_ind, ts_smap, ts_prec, lasso_alpha, standardi
         SMAP time series (with NAN)
     ts_prec: <pd.Series>
         IMERG precipitation time series
-    lasso_alpha: <float>
+    regression_type: <str>
+        Options: linear; lasso
+    X_version: <str>
+        # v1: [SM, P]
+        # v2: [SM, P, SM*P]
+
+    ### **kwargs ###
+    lasso_alpha: <float> (only needed if regression_type = lasso)
         alpha paramter in Lasso fitting
     standardize: <bool>
         Whether to standardize X and center Y; default: True
@@ -181,8 +190,10 @@ def lasso_time_series(lat_ind, lon_ind, ts_smap, ts_prec, lasso_alpha, standardi
         Y.append(y)
         # Calculate x
         prec = prec_sum / dt  # [mm/hour]
-#        x = [sm_last, prec, sm_last * prec]
-        x = [sm_last, prec]
+        if X_version == 'v1':
+            x = [sm_last, prec]
+        elif X_version == 'v2':
+            x = [sm_last, prec, sm_last * prec]
         X.append(x)
         # Save time
         times.append(df.index[smap_ind[i]])
@@ -195,8 +206,8 @@ def lasso_time_series(lat_ind, lon_ind, ts_smap, ts_prec, lasso_alpha, standardi
         print('Too few valid data points for pixel {} {} - discard!'.format(lat_ind, lon_ind))
         return None
 
-    # --- Standardize X and center Y --- #
-    if standardize is True:
+    # --- Standardize X and center Y, if specified --- #
+    if kwargs['standardize'] is True:
         # Standardize X
         X = X - np.mean(X, axis=0)
         X_std = np.std(X, axis=0)
@@ -205,18 +216,24 @@ def lasso_time_series(lat_ind, lon_ind, ts_smap, ts_prec, lasso_alpha, standardi
         # Center Y
         Y = Y - np.mean(Y)
 
-    # --- Lasso regression --- #
-    # Prepare Lasso regressor
-    reg = linear_model.Lasso(alpha=lasso_alpha,
-                             fit_intercept=False)
+    # --- Run regression --- #
+    # Prepare regressor
+    if regression_type == 'linear':
+        reg = linear_model.LinearRegression(fit_intercept=False)
+    elif regression_type == 'lasso':
+        reg = linear_model.Lasso(alpha=kwargs['lasso_alpha'],
+                                 fit_intercept=False)
     # Fit data
     model = reg.fit(X, Y)
-    # --- Calculate residual --- #
-    resid = Y - reg.predict(X)
+    # --- Calculate R^2 --- #
+    Y_pred = model.predict(X)
+    R2 = r2_score(Y, Y_pred)
+#    resid = Y - reg.predict(X)
 
     # --- Put final results in dict --- #
     dict_results_ts = {}
     dict_results_ts['model'] = model
+    dict_results_ts['R2'] = R2
 #    dict_results_ts['X'] = X
 #    dict_results_ts['Y'] = Y
 #    dict_results_ts['times'] = times
