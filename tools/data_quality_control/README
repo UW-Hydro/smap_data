@@ -1,0 +1,15 @@
+Data quality control steps:
+
+1. rescale_SMAP_PM2AM.py
+    1) Exclude constant-value SMAP pixels
+    2) Rescale SMAP PM data to AM regime via seasonal CDF matching
+
+2. apply_qual_flag_SMAP.py
+    1) Apply internal SMAP retrieval quality control flag
+
+3. quality_control_GPM.py
+    1) Exclude all-zero-precipitation pixels
+
+
+
+
