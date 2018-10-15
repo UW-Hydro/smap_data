@@ -210,12 +210,14 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     # --- Standardize X and center Y, if specified --- #
     if kwargs['standardize'] is True:
         # Standardize X
-        X = X - np.mean(X, axis=0)
-        X_std = np.std(X, axis=0)
+        X_mean = np.mean(X, axis=0)  # [n_coef]
+        X = X - X_mean
+        X_std = np.std(X, axis=0)  # [n_coef]
         X_std[np.all(X==0, axis=0)] = 1  # if an X column is all zero, do not standardize
         X = X / X_std
-        # Center Y
-        Y = Y - np.mean(Y)
+        # Center Y - in our case, Y should be already be around zero!
+        Y_mean = np.mean(Y)
+        Y = Y - Y_mean
 
     # --- Run regression --- #
     # Prepare regressor
@@ -226,15 +228,26 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
                                  fit_intercept=False)
     # Fit data
     model = reg.fit(X, Y)
+
     # --- Calculate R^2 --- #
     Y_pred = model.predict(X)
     R2 = r2_score(Y, Y_pred)
 #    resid = Y - reg.predict(X)
 
+    # --- If standardize X, convert fitted coefficients back to the original X regime --- #
+    if kwargs['standardize'] is True:
+        # Scale back coefficients
+        model.coef_ = model.coef_ / X_std
+        # Calculate intercept in the original X and Y regime
+        intercept = Y_mean - model.coef_ * X_mean
+
     # --- Put final results in dict --- #
     dict_results_ts = {}
     dict_results_ts['model'] = model
     dict_results_ts['R2'] = R2
+    if kwargs['standardize'] is True:
+        dict_results_ts['intercept'] = intercept
+        dict_results_ts['X_std'] = X_std
 #    dict_results_ts['X'] = X
 #    dict_results_ts['Y'] = Y
 #    dict_results_ts['times'] = times
