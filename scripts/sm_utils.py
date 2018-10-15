@@ -203,7 +203,7 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     times = pd.to_datetime(times)
 
     # --- If there are <= 10 data points, discard this cell --- #
-    if len(Y) <= 10:
+    if len(Y) <= 150:
         print('Too few valid data points for pixel {} {} - discard!'.format(lat_ind, lon_ind))
         return None
 
