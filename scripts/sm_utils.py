@@ -222,7 +222,7 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     # Critical t (H0: r=0; H1: r>0. One-sided; alpha=0.1)
     t_critical = scipy.stats.t.ppf(0.9, df=n-2)
     if t < t_critical:  # zero r
-        print('Precipitation not positively correlated with Y for pixel {} {}, drop precipitation term(s)'.format(
+        print('Precipitation not positively correlated with Y for pixel {} {} - drop precipitation term(s)'.format(
             lat_ind, lon_ind))
         if X_version == 'v1':
             list_deleted_columns.append(1)
@@ -231,7 +231,7 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
             list_deleted_columns.append(2)
     # 2) If precip > 0 timestep < 10%, only keep one P term to be stable
     elif (X_prec>0).sum() / len(X_prec) < 0.1:
-        print('Precipitation > 0 timesteps fewer than 10% for pixel {} {}; only keep one P term'.format(
+        print('Precipitation > 0 timesteps fewer than 10% for pixel {} {} - only keep one P term'.format(
             lat_ind, lon_ind))
         if X_version == 'v2':
             list_deleted_columns.append(2)
