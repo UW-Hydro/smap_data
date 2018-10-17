@@ -125,13 +125,13 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     ts_prec: <pd.Series>
         IMERG precipitation time series
     regression_type: <str>
-        Options: linear; lasso
+        Options: linear; lasso; ridge
     X_version: <str>
         # v1: [SM, P]
         # v2: [SM, P, SM*P]
 
     ### **kwargs ###
-    lasso_alpha: <float> (only needed if regression_type = lasso)
+    alpha: <float> (only needed if regression_type = lasso or ridge)
         alpha paramter in Lasso fitting
     standardize: <bool>
         Whether to standardize X and center Y; default: True
@@ -224,7 +224,10 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     if regression_type == 'linear':
         reg = linear_model.LinearRegression(fit_intercept=False)
     elif regression_type == 'lasso':
-        reg = linear_model.Lasso(alpha=kwargs['lasso_alpha'],
+        reg = linear_model.Lasso(alpha=kwargs['alpha'],
+                                 fit_intercept=False)
+    elif regression_type == 'ridge':
+        reg = linear_model.Ridge(alpha=kwargs['alpha'],
                                  fit_intercept=False)
     # Fit data
     model = reg.fit(X, Y)

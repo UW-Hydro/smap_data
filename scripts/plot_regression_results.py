@@ -4,6 +4,8 @@ import xarray as xr
 import pickle
 import numpy as np
 import os
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
@@ -48,14 +50,14 @@ standardize = cfg['REGRESSION']['standardize']
 X_version = cfg['REGRESSION']['X_version']
 if regression_type == 'linear':
     pass
-elif regression_type == 'lasso':
-    lasso_alpha = cfg['REGRESSION']['lasso_alpha']
+elif regression_type == 'lasso' or regression_type == 'ridge':
+    alpha = cfg['REGRESSION']['alpha']
 # Construct result filename
 file_basename = 'X_{}.{}.{}.{}'.format(
     X_version,
     regression_type,
     'standardize' if standardize else 'no_standardize',
-    '{}.'.format(lasso_alpha) if regression_type == 'lasso' else '')
+    '{}.'.format(alpha) if regression_type == 'lasso' or regression_type == 'ridge' else '')
 result_pickle = 'results.{}pickle'.format(file_basename)
 # Load results dict
 with open(os.path.join(
@@ -148,8 +150,12 @@ for i in range(n_coef):
     # Set projection
     ax = plt.axes(projection=ccrs.PlateCarree())
     gl = add_gridlines(ax, alpha=0)
+    # Determine colormap range - 5th or 95th quantile, whichever
+    # has bigger magnitude
+    mag1 = np.absolute(list_coef[i].quantile(0.05).values)
+    mag2 = np.absolute(list_coef[i].quantile(0.95).values)
+    vmax = np.max([mag1, mag2])
     # Plot
-    vmax = list_coef[i].std().values * 3
     cs = list_coef[i].where(da_domain==1).plot.pcolormesh(
         'lon', 'lat', ax=ax,
         add_colorbar=False,

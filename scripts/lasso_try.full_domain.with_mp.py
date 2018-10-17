@@ -56,9 +56,9 @@ standardize = cfg['REGRESSION']['standardize']
 X_version = cfg['REGRESSION']['X_version']
 if regression_type == 'linear':
     kwargs = {'standardize': standardize}
-elif regression_type == 'lasso':
-    lasso_alpha = cfg['REGRESSION']['lasso_alpha']
-    kwargs = {'lasso_alpha': lasso_alpha,
+elif regression_type == 'lasso' or regression_type == 'ridge':
+    alpha = cfg['REGRESSION']['alpha']
+    kwargs = {'alpha': alpha,
               'standardize': standardize}
 else:
     raise ValueError('Input regression_type = {} not recognizable!'.format(regression_type))
@@ -92,7 +92,7 @@ file_basename = 'results.X_{}.{}.{}.{}'.format(
     X_version,
     regression_type,
     'standardize' if standardize else 'no_standardize',
-    '{}.'.format(lasso_alpha) if regression_type == 'lasso' else '')
+    '{}.'.format(alpha) if regression_type == 'lasso' or regression_type == 'ridge' else '')
 
 with open(os.path.join(output_dir, '{}pickle'.format(file_basename)), 'wb') as f:
     pickle.dump(dict_results, f)
