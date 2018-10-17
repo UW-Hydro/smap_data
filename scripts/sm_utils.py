@@ -11,6 +11,7 @@ import xesmf as xe
 import numpy as np
 from sklearn import linear_model
 from sklearn.metrics import r2_score
+import scipy.stats
 import pickle
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 
@@ -195,6 +196,8 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
             x = [sm_last, prec]
         elif X_version == 'v2':
             x = [sm_last, prec, sm_last * prec]
+        else:
+            raise ValueError('Input X_version = {} unrecognizable!'.format(X_version))
         X.append(x)
         # Save time
         times.append(df.index[smap_ind[i]])
@@ -206,6 +209,27 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     if len(Y) <= 150:
         print('Too few valid data points for pixel {} {} - discard!'.format(lat_ind, lon_ind))
         return None
+
+    # --- If precipitation (at > 0 timesteps) is not positively correlated with Y, drop all precipitation terms --- #
+    # NOTE: assume the second column in X is precipitation!!!
+    n = len(Y)
+    X_prec = X[:, 1]
+    r = np.corrcoef(X_prec[X_prec>0], Y[X_prec>0])[0, 1]
+    t = r * np.sqrt((n-2) / (1-r*r))
+    # Critical t (H0: r=0; H1: r>0. One-sided; alpha=0.1)
+    t_critical = scipy.stats.t.ppf(0.9, df=n-2)
+    if t >= t_critical:  # Positive r
+        list_deleted_columns = []
+    else:  # zero r
+        print('Precipitation not positively correlated with Y for pixel {} {}, drop precipitation term(s)'.format(
+            lat_ind, lon_ind))
+        if X_version == 'v1':
+            list_deleted_columns = [1]
+        elif X_version == 'v2':
+            list_deleted_columns = [1, 2]
+    # Drop columns
+    if len(list_deleted_columns) > 0:
+        X = np.delete(X, list_deleted_columns, axis=1)
 
     # --- Standardize X and center Y, if specified --- #
     if kwargs['standardize'] is True:
@@ -232,10 +256,12 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     # Fit data
     model = reg.fit(X, Y)
 
-    # --- Calculate R^2 --- #
+    # --- Calculate statistics --- #
     Y_pred = model.predict(X)
+    # R2
     R2 = r2_score(Y, Y_pred)
-#    resid = Y - reg.predict(X)
+    # RMSE
+    RMSE = rmse(Y, Y_pred)
 
     # --- If standardize X, convert fitted coefficients back to the original X regime --- #
     if kwargs['standardize'] is True:
@@ -244,10 +270,18 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
         # Calculate intercept in the original X and Y regime
         intercept = Y_mean - model.coef_ * X_mean
 
+    # --- If dropped variable(s) in X, assign zero coef --- #
+    if len(list_deleted_columns) > 0:
+        indices_to_insert = np.sort(np.unique(np.asarray(
+            list_deleted_columns)))
+        for i in indices_to_insert:
+            model.coef_ = np.insert(model.coef_, i, 0)
+
     # --- Put final results in dict --- #
     dict_results_ts = {}
     dict_results_ts['model'] = model
     dict_results_ts['R2'] = R2
+    dict_results_ts['RMSE'] = RMSE
     if kwargs['standardize'] is True:
         dict_results_ts['intercept'] = intercept
         dict_results_ts['X_std'] = X_std
@@ -273,3 +307,25 @@ def add_gridlines(axis,
     return gl
 
 
+def rmse(true, est):
+    ''' Calculates RMSE of an estimated variable compared to the truth variable
+
+    Parameters
+    ----------
+    true: <np.array>
+        A 1-D array of time series of true values
+    est: <np.array>
+        A 1-D array of time series of estimated values (must be the same length of true)
+
+    Returns
+    ----------
+    rmse: <float>
+        Root mean square error
+
+    Require
+    ----------
+    numpy
+    '''
+
+    rmse = np.sqrt(sum((est - true)**2) / len(true))
+    return rmse
