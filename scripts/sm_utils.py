@@ -214,6 +214,7 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     # NOTE: assume the second column in X is precipitation!!!
     list_deleted_columns = []
     n = len(Y)
+    n_coef = X.shape[1]
     X_prec = X[:, 1]
     # 1) Check if precipitation (at > 0 timesteps) is positively correlated with Y
     #    if not, drop all precipitation terms --- #
@@ -235,6 +236,15 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
             lat_ind, lon_ind))
         if X_version == 'v2':
             list_deleted_columns.append(2)
+    # 3) If two variables in X are hightly correlated, drop the latter
+    for i in range(n_coef-1):
+        for j in range(i+1, n_coef):
+            if(np.corrcoef(X[:, i], X[:, j])[0, 1] >= 0.98):
+                print(('Variables {} and {} have correlation coefficient '
+                       '>= 0.98 for pixel {} {} - drop the latter variable').format(
+                            i+1, j+1, lat_ind, lon_ind))
+                # Record the second column to be deleted
+                list_deleted_columns.append(j)
     # Drop columns
     if len(list_deleted_columns) > 0:
         X = np.delete(X, list_deleted_columns, axis=1)
