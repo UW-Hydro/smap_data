@@ -94,6 +94,8 @@ for i in range(n_coef):
     list_coef.append(da_init)
 # R^2
 da_R2 = da.copy(True)
+# RMSE
+da_RMSE = da.copy(True)
 
 # --- Extract results --- #
 for latlon_ind, item in dict_results.items():
@@ -103,10 +105,13 @@ for latlon_ind, item in dict_results.items():
     fitted_coef = item['model'].coef_
     # Extract R^2
     R2 = item['R2']
+    # Extract RMSE
+    RMSE = item['RMSE']
     # Put results into da
     for i in range(n_coef):
         list_coef[i][lat_ind, lon_ind] = fitted_coef[i]
     da_R2[lat_ind, lon_ind] = R2
+    da_RMSE[lat_ind, lon_ind] = RMSE
 
 
 # ======================================= #
@@ -135,6 +140,34 @@ fig.savefig(
     os.path.join(
         output_plot_dir,
         '{}R2.png'.format(file_basename)),
+    format='png', bbox_inches='tight', pad_inches=0)
+
+
+# ======================================= #
+# Plot RMSE
+# ======================================= #
+print('Plotting RMSE...')
+
+fig = plt.figure(figsize=(12, 5))
+# Set projection
+ax = plt.axes(projection=ccrs.PlateCarree())
+gl = add_gridlines(ax, alpha=0)
+# Plot
+cs = da_RMSE.where(da_domain==1).plot.pcolormesh(
+    'lon', 'lat', ax=ax,
+    add_colorbar=False,
+    add_labels=False,
+    cmap='plasma_r',
+    transform=ccrs.PlateCarree())
+cbar = plt.colorbar(cs, extend='min')
+cbar.set_label('RMSE (mm/mm * hour-1)', fontsize=20)
+plt.title('RMSE (domain-median = {:.2f})'.format(
+    da_RMSE.where(da_domain==1).median().values), fontsize=20)
+# Save fig
+fig.savefig(
+    os.path.join(
+        output_plot_dir,
+        '{}RMSE.png'.format(file_basename)),
     format='png', bbox_inches='tight', pad_inches=0)
 
 

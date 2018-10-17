@@ -210,23 +210,31 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
         print('Too few valid data points for pixel {} {} - discard!'.format(lat_ind, lon_ind))
         return None
 
-    # --- If precipitation (at > 0 timesteps) is not positively correlated with Y, drop all precipitation terms --- #
+    # --- Quality control for precipitation data --- #
     # NOTE: assume the second column in X is precipitation!!!
+    list_deleted_columns = []
     n = len(Y)
     X_prec = X[:, 1]
+    # 1) Check if precipitation (at > 0 timesteps) is positively correlated with Y
+    #    if not, drop all precipitation terms --- #
     r = np.corrcoef(X_prec[X_prec>0], Y[X_prec>0])[0, 1]
     t = r * np.sqrt((n-2) / (1-r*r))
     # Critical t (H0: r=0; H1: r>0. One-sided; alpha=0.1)
     t_critical = scipy.stats.t.ppf(0.9, df=n-2)
-    if t >= t_critical:  # Positive r
-        list_deleted_columns = []
-    else:  # zero r
+    if t < t_critical:  # zero r
         print('Precipitation not positively correlated with Y for pixel {} {}, drop precipitation term(s)'.format(
             lat_ind, lon_ind))
         if X_version == 'v1':
-            list_deleted_columns = [1]
+            list_deleted_columns.append(1)
         elif X_version == 'v2':
-            list_deleted_columns = [1, 2]
+            list_deleted_columns.append(1)
+            list_deleted_columns.append(2)
+    # 2) If precip > 0 timestep < 10%, only keep one P term to be stable
+    elif (X_prec>0).sum() / len(X_prec) < 0.1:
+        print('Precipitation > 0 timesteps fewer than 10% for pixel {} {}; only keep one P term'.format(
+            lat_ind, lon_ind))
+        if X_version == 'v2':
+            list_deleted_columns.append(2)
     # Drop columns
     if len(list_deleted_columns) > 0:
         X = np.delete(X, list_deleted_columns, axis=1)
@@ -261,7 +269,7 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     # R2
     R2 = r2_score(Y, Y_pred)
     # RMSE
-    rmse = rmse(Y, Y_pred)
+    RMSE = rmse(Y, Y_pred)
 
     # --- If standardize X, convert fitted coefficients back to the original X regime --- #
     if kwargs['standardize'] is True:
@@ -281,7 +289,7 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     dict_results_ts = {}
     dict_results_ts['model'] = model
     dict_results_ts['R2'] = R2
-    dict_results_ts['rmse'] = rmse
+    dict_results_ts['RMSE'] = RMSE
     if kwargs['standardize'] is True:
         dict_results_ts['intercept'] = intercept
         dict_results_ts['X_std'] = X_std
