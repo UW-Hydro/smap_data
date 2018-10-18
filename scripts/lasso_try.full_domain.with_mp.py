@@ -46,6 +46,15 @@ output_dir = cfg['OUTPUT']['output_dir']
 
 
 # ========================================= #
+# Make output subdir
+# ========================================= #
+# Output data dir
+output_data_dir = os.path.join(output_dir, 'data')
+if not os.path.exists(output_data_dir):
+    os.makedirs(output_data_dir)
+
+
+# ========================================= #
 # Run regression
 # ========================================= #
 dict_results = {}  # {latind_lonind: model/X/Y/times/resid: result}
@@ -88,13 +97,13 @@ for d in results:
 # ========================================= #
 # --- Save dict --- #
 print('Saving dict to file...')
-file_basename = 'results.X_{}.{}.{}.{}'.format(
+file_basename = 'X_{}.{}.{}.{}'.format(
     X_version,
     regression_type,
     'standardize' if standardize else 'no_standardize',
     '{}.'.format(alpha) if regression_type == 'lasso' or regression_type == 'ridge' else '')
 
-with open(os.path.join(output_dir, '{}pickle'.format(file_basename)), 'wb') as f:
+with open(os.path.join(output_data_dir, '{}pickle'.format(file_basename)), 'wb') as f:
     pickle.dump(dict_results, f)
 
 # --- Extract n_coef --- #
@@ -106,24 +115,60 @@ for latlon_ind, item in dict_results.items():
     n_coef = len(fitted_coef)
     break
 
-# --- Save results to file --- #
-print('Saving results to file...')
-f = open(os.path.join(output_dir, '{}txt'.format(file_basename)), 'w')
-# Write header line
-f.write('lat\t\tlon\t\t')
+
+# ========================================= #
+# Re-organize results and save to netCDF
+# ========================================= #
+# --- Prepare empty result spatial da --- #
+list_coef = []  # A list of results da for each Lasso param
+# Prepare an initial da to store results
+init = da_domain.values
+init = init.astype(float)
+init[:] = np.nan
+da = da_domain.copy(deep=True)
+da = da.astype(float)
+da[:] = init
+# Fitted coefficients
 for i in range(n_coef):
-    f.write('coef{}\t'.format(i+1))
-f.write('\n')
-# Write results
-for lat_ind in range(len(da_domain['lat'])):
-    for lon_ind in range(len(da_domain['lon'])):
-        if '{}_{}'.format(lat_ind, lon_ind) in dict_results.keys():
-            model = dict_results['{}_{}'.format(lat_ind, lon_ind)]['model']
-            lat = da_domain[lat_ind, lon_ind]['lat'].values
-            lon = da_domain[lat_ind, lon_ind]['lon'].values
-            f.write('{:.4f}\t{:.4f}\t'.format(lat, lon))
-            for i in range(n_coef):
-                f.write('{:.8f}\t'.format(model.coef_[0]))
-            f.write('\n')
-f.close() 
+    da_init = da.copy(True)
+    list_coef.append(da_init)
+# R^2
+da_R2 = da.copy(True)
+# RMSE
+da_RMSE = da.copy(True)
+
+# --- Extract results --- #
+for latlon_ind, item in dict_results.items():
+    lat_ind = int(latlon_ind.split('_')[0])
+    lon_ind = int(latlon_ind.split('_')[1])
+    # Extract fitted coef
+    fitted_coef = item['model'].coef_
+    # Extract R^2
+    R2 = item['R2']
+    # Extract RMSE
+    RMSE = item['RMSE']
+    # Put results into da
+    for i in range(n_coef):
+        list_coef[i][lat_ind, lon_ind] = fitted_coef[i]
+    da_R2[lat_ind, lon_ind] = R2
+    da_RMSE[lat_ind, lon_ind] = RMSE
+
+# --- Save to netCDF --- #
+# coefficients
+for i in range(n_coef):
+    ds = xr.Dataset({'coef': list_coef[i]})
+    ds.to_netcdf(os.path.join(output_data_dir,
+                              '{}fitted_coef.{}.nc'.format(file_basename, i+1)),
+                 format='NETCDF4_CLASSIC')
+# R2
+ds_R2 = xr.Dataset({'R2': da_R2})
+ds_R2.to_netcdf(os.path.join(output_data_dir,
+                            '{}R2.nc'.format(file_basename, i+1)),
+                format='NETCDF4_CLASSIC')
+
+# RMSE
+ds_RMSE = xr.Dataset({'RMSE': da_RMSE})
+ds_RMSE.to_netcdf(os.path.join(output_data_dir,
+                               '{}RMSE.nc'.format(file_basename, i+1)),
+                  format='NETCDF4_CLASSIC')
 

@@ -8,6 +8,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
+import cartopy
 
 from tonic.io import read_config, read_configobj
 from sm_utils import add_gridlines
@@ -23,16 +24,21 @@ cfg = read_configobj(sys.argv[1])
 # Parameter setting
 # ======================================= #
 # Output data dir
-output_data_dir = cfg['OUTPUT']['output_dir']
+output_dir = cfg['OUTPUT']['output_dir']
 
 
 # ======================================= #
 # Make output plot dir
 # ======================================= #
 # Output plot dir
-output_plot_dir = os.path.join(output_data_dir, 'plots')
+output_plot_dir = os.path.join(output_dir, 'plots')
 if not os.path.exists(output_plot_dir):
     os.makedirs(output_plot_dir)
+
+# Output data dir
+output_data_dir = os.path.join(output_dir, 'data')
+if not os.path.exists(output_data_dir):
+    os.makedirs(output_data_dir)
 
 
 # ======================================= #
@@ -59,59 +65,40 @@ file_basename = 'X_{}.{}.{}.{}'.format(
     'standardize' if standardize else 'no_standardize',
     '{}.'.format(alpha) if regression_type == 'lasso' or regression_type == 'ridge' else '')
 result_pickle = 'results.{}pickle'.format(file_basename)
-# Load results dict
-with open(os.path.join(
-    output_data_dir, result_pickle), 'rb') as f:
-    dict_results = pickle.load(f)
 
-# Extract n_coef
-for latlon_ind, item in dict_results.items():
-    lat_ind = int(latlon_ind.split('_')[0])
-    lon_ind = int(latlon_ind.split('_')[1])
-    # Extract fitted coef
-    fitted_coef = item['model'].coef_
-    n_coef = len(fitted_coef)
-    break
+# Determine n_coef
+if X_version == 'v1':
+    n_coef = 2
+elif X_version == 'v2':
+    n_coef = 3
 
 
 # ======================================= #
-# Extract results
+# Load result netCDF
 # ======================================= #
-print('Extracting results...')
+print('Loading results...')
 
-# --- Prepare empty result spatial da --- #
-list_coef = []  # A list of results da for each Lasso param
-# Prepare an initial da to store results
-init = da_domain.values
-init = init.astype(float)
-init[:] = np.nan
-da = da_domain.copy(deep=True)
-da = da.astype(float)
-da[:] = init
-# Fitted coefficients
+# Coef
+list_coef = []
 for i in range(n_coef):
-    da_init = da.copy(True)
-    list_coef.append(da_init)
-# R^2
-da_R2 = da.copy(True)
+    da_coef = xr.open_dataset(
+        os.path.join(output_data_dir,
+        '{}fitted_coef.{}.nc'.format(file_basename, i+1)))['coef']
+    da_coef.load()
+    da_coef.close()
+    list_coef.append(da_coef)
+# R2
+da_R2 = xr.open_dataset(os.path.join(
+    output_data_dir,
+    '{}R2.nc'.format(file_basename, i+1)))['R2']
+da_R2.load()
+da_R2.close()
 # RMSE
-da_RMSE = da.copy(True)
-
-# --- Extract results --- #
-for latlon_ind, item in dict_results.items():
-    lat_ind = int(latlon_ind.split('_')[0])
-    lon_ind = int(latlon_ind.split('_')[1])
-    # Extract fitted coef
-    fitted_coef = item['model'].coef_
-    # Extract R^2
-    R2 = item['R2']
-    # Extract RMSE
-    RMSE = item['RMSE']
-    # Put results into da
-    for i in range(n_coef):
-        list_coef[i][lat_ind, lon_ind] = fitted_coef[i]
-    da_R2[lat_ind, lon_ind] = R2
-    da_RMSE[lat_ind, lon_ind] = RMSE
+da_RMSE = xr.open_dataset(os.path.join(
+    output_data_dir,
+    '{}RMSE.nc'.format(file_basename, i+1)))['RMSE']
+da_RMSE.load()
+da_RMSE.close()
 
 
 # ======================================= #
@@ -123,6 +110,9 @@ fig = plt.figure(figsize=(12, 5))
 # Set projection
 ax = plt.axes(projection=ccrs.PlateCarree())
 gl = add_gridlines(ax, alpha=0)
+ax.add_feature(cartopy.feature.LAND,
+           facecolor=[1, 1, 1],
+           edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
 # Plot
 cs = da_R2.where(da_domain==1).plot.pcolormesh(
     'lon', 'lat', ax=ax,
@@ -132,8 +122,8 @@ cs = da_R2.where(da_domain==1).plot.pcolormesh(
     vmin=0, vmax=1,
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='min')
-cbar.set_label('R^2', fontsize=20)
-plt.title('R^2 (domain-median = {:.2f})'.format(
+cbar.set_label('$R^2$', fontsize=20)
+plt.title('$R^2$ (domain-median = {:.2f})'.format(
     da_R2.where(da_domain==1).median().values), fontsize=20)
 # Save fig
 fig.savefig(
@@ -152,16 +142,20 @@ fig = plt.figure(figsize=(12, 5))
 # Set projection
 ax = plt.axes(projection=ccrs.PlateCarree())
 gl = add_gridlines(ax, alpha=0)
+ax.add_feature(cartopy.feature.LAND,
+           facecolor=[1, 1, 1],
+           edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
 # Plot
 cs = da_RMSE.where(da_domain==1).plot.pcolormesh(
     'lon', 'lat', ax=ax,
     add_colorbar=False,
     add_labels=False,
     cmap='plasma_r',
+    vmin=0, vmax=0.005,
     transform=ccrs.PlateCarree())
-cbar = plt.colorbar(cs, extend='min')
-cbar.set_label('RMSE (mm/mm * hour-1)', fontsize=20)
-plt.title('RMSE (domain-median = {:.2f})'.format(
+cbar = plt.colorbar(cs, extend='max')
+cbar.set_label('RMSE (mm/mm / hour)', fontsize=20)
+plt.title('RMSE (domain-median = {:.4f})'.format(
     da_RMSE.where(da_domain==1).median().values), fontsize=20)
 # Save fig
 fig.savefig(
@@ -176,13 +170,15 @@ fig.savefig(
 # ======================================= #
 print('Ploting fitted coefficients...')
 
-list_coef_name = cfg['PLOT']['coef_names']
-list_cbar_label = cfg['PLOT']['cbar_label']
+# --- Plot raw coefficients --- #
 for i in range(n_coef):
     fig = plt.figure(figsize=(12, 5))
     # Set projection
     ax = plt.axes(projection=ccrs.PlateCarree())
     gl = add_gridlines(ax, alpha=0)
+    ax.add_feature(cartopy.feature.LAND,
+               facecolor=[1, 1, 1],
+               edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
     # Determine colormap range - 5th or 95th quantile, whichever
     # has bigger magnitude
     mag1 = np.absolute(list_coef[i].quantile(0.05).values)
@@ -197,11 +193,135 @@ for i in range(n_coef):
         vmin=-vmax, vmax=vmax,
         transform=ccrs.PlateCarree())
     cbar = plt.colorbar(cs, extend='both')
-    cbar.set_label(list_cbar_label[i], fontsize=20)
-    plt.title('Fitted coef: '+list_coef_name[i], fontsize=20)
+    cbar.set_label(r'$\beta${}'.format(i+1), fontsize=20)
+    plt.title(r'Fitted coef $\beta${}'.format(i+1), fontsize=20)
     # Save fig
     fig.savefig(
         os.path.join(
             output_plot_dir,
             '{}fitted_coef.{}.png'.format(file_basename, i+1)),
         format='png', bbox_inches='tight', pad_inches=0)
+
+
+# --- Interpretation of beta 1 (SM) --- #
+# 1) -beta1 - linear loss function slope
+beta1 = - list_coef[0] * 24  # convert to [day-1]
+fig = plt.figure(figsize=(12, 5))
+# Set projection
+ax = plt.axes(projection=ccrs.PlateCarree())
+gl = add_gridlines(ax, alpha=0)
+ax.add_feature(cartopy.feature.LAND,
+               facecolor=[1, 1, 1],
+               edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
+# Plot
+cs = beta1.where(da_domain==1).plot.pcolormesh(
+    'lon', 'lat', ax=ax,
+    add_colorbar=False,
+    add_labels=False,
+    cmap='PuBuGn',
+    vmin=0, vmax=0.6,
+    transform=ccrs.PlateCarree())
+cbar = plt.colorbar(cs, extend='both')
+cbar.set_label(r'${\beta}_1$ ' + r'$(day^-1)$', fontsize=20)
+plt.title('Loss function linear slope', fontsize=20)
+# Save fig
+fig.savefig(
+    os.path.join(
+        output_plot_dir,
+        '{}.loss_slope.png'.format(file_basename, i+1)),
+    format='png', bbox_inches='tight', pad_inches=0)
+
+# 2) -1/beta1 - exponential decay e-folding time scale tau
+tau = - 1 / (list_coef[0] * 24)  # [day]
+fig = plt.figure(figsize=(12, 5))
+# Set projection
+ax = plt.axes(projection=ccrs.PlateCarree())
+gl = add_gridlines(ax, alpha=0)
+ax.add_feature(cartopy.feature.LAND,
+               facecolor=[1, 1, 1],
+               edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
+# Plot
+cs = tau.where(da_domain==1).plot.pcolormesh(
+    'lon', 'lat', ax=ax,
+    add_colorbar=False,
+    add_labels=False,
+    cmap='YlGnBu',
+    vmin=0, vmax=20,
+    transform=ccrs.PlateCarree())
+cbar = plt.colorbar(cs, extend='both')
+cbar.set_label(r'${\tau}$ ' + '(day)', fontsize=20)
+plt.title('SM exponential decay e-folding time scale', fontsize=20)
+# Save fig
+fig.savefig(
+    os.path.join(
+        output_plot_dir,
+        '{}.decay_tau.png'.format(file_basename, i+1)),
+    format='png', bbox_inches='tight', pad_inches=0)
+
+
+# --- Interpretation of beta 2 (P) --- #
+# beta2 * 50mm - fraction of P flux that is added to the top 5cm soil
+# (if P*SM presents, this interpretation is for when SM=0)
+P_frac = list_coef[1] * 50  # convert from [mm-1] to [-]
+fig = plt.figure(figsize=(12, 5))
+# Set projection
+ax = plt.axes(projection=ccrs.PlateCarree())
+gl = add_gridlines(ax, alpha=0)
+ax.add_feature(cartopy.feature.LAND,
+               facecolor=[1, 1, 1],
+               edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
+# Plot
+cs = P_frac.where(da_domain==1).plot.pcolormesh(
+    'lon', 'lat', ax=ax,
+    add_colorbar=False,
+    add_labels=False,
+    cmap='PuBuGn',
+    vmin=0, vmax=1,
+    transform=ccrs.PlateCarree())
+cbar = plt.colorbar(cs, extend='both')
+cbar.set_label('Fraction (-)', fontsize=20)
+plt.title('Fraction of P flux reflected in the surface-layer SM\n'
+          '(if P*SM presents, this interpretation is for when SM=0)',
+          fontsize=20)
+# Save fig
+fig.savefig(
+    os.path.join(
+        output_plot_dir,
+        '{}.P_frac.png'.format(file_basename, i+1)),
+    format='png', bbox_inches='tight', pad_inches=0)
+
+
+# --- Interpretation of beta 3 (SM*P) --- #
+# beta3 * 50mm - how much P_frac changes with SM level
+# only for X_v2
+if X_version == 'v2':
+    P_frac_with_SM = list_coef[2]  # convert from [-/mm]
+    fig = plt.figure(figsize=(12, 5))
+    # Set projection
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    gl = add_gridlines(ax, alpha=0)
+    ax.add_feature(cartopy.feature.LAND,
+                   facecolor=[1, 1, 1],
+                   edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
+    # Plot
+    cs = P_frac_with_SM.where(da_domain==1).plot.pcolormesh(
+        'lon', 'lat', ax=ax,
+        add_colorbar=False,
+        add_labels=False,
+        cmap='PuBuGn_r',
+        vmin=-0.2, vmax=0,
+        transform=ccrs.PlateCarree())
+    cbar = plt.colorbar(cs, extend='both')
+    cbar.set_label('Sensitivity of fraction\nto SM level (-/mm)',
+                   fontsize=20)
+    plt.title('Sensitivity of fraction of P flux (reflected \n'
+              'in the surface-layer SM) to SM level',
+              fontsize=20)
+    # Save fig
+    fig.savefig(
+        os.path.join(
+            output_plot_dir,
+            '{}.P_frac_with_SM.png'.format(file_basename, i+1)),
+        format='png', bbox_inches='tight', pad_inches=0)
+
+
