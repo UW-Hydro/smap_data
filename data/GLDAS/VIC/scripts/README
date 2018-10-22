@@ -12,3 +12,5 @@ Steps of downloading/processing GLDAS data:
 6. downsample_SM.py - Downsample 12H SM data (6AM & 6PM UTC) to specified temporal resolution (e.g., 3D); the original 12H timestamps are preserved
 
 7. downsample_SM_SMAP_freq.py - Downsample 12H SM data to SMAP temporal resolution (NOTE: data gaps are not strictly the same as SMAP gaps, since SMAP is in local solar time while GLDAS is in UTC); the original 12H timestamps are preserved
+
+8. separate_seasons_SMAP.py - Separate Jun-Sep and Dec-Mar data; apply this step to both 3D and smap_freq SM data
