@@ -1,7 +1,6 @@
 
 # This script:
-#   1) Exclude constant-value SMAP pixels
-#   2) takes care the SMAP AM & PM systematic bias
+#   1) takes care the SMAP AM & PM systematic bias
 #       Specifically, remap SMAP PM data to AM regime using seasonal CDF matching
 
 import sys
@@ -28,8 +27,9 @@ nproc = int(sys.argv[1])
 # ========================================== #
 # Parameter setting
 # ========================================== #
-# Original SMAP nc
-smap_nc = '/civil/hydro/ymao/smap_data/tools/prepare_SMAP/output/data/soil_moisture.20150331_20171231.nc'
+# Original SMAP nc (already applied quality flag or pixel quality control)
+#smap_nc = '/civil/hydro/ymao/smap_data/tools/prepare_SMAP/output/data/soil_moisture.20150331_20171231.nc'
+smap_nc = '/civil/hydro/ymao/smap_data/tools/data_quality_control/output/data/smap.recom_qual.20150401_20180331.nc'
 # SMAP domain nc
 domain_nc = '/civil/hydro/ymao/smap_data/param/domain/smap.domain.global.nc'
 
@@ -112,7 +112,7 @@ print('Save to file')
 ds_smap_new = xr.Dataset({'soil_moisture': da_smap})
 ds_smap_new.to_netcdf(
     os.path.join(output_dir,
-                 'smap.PM_rescaled.{}_{}.nc'.format(
+                 'smap.recom_qual.PM_rescaled.{}_{}.nc'.format(
                     start_time.strftime('%Y%m%d'),
                     end_time.strftime('%Y%m%d'))),
     format='NETCDF4_CLASSIC')

@@ -5,6 +5,7 @@ import xarray as xr
 import numpy as np
 import scipy.stats
 import pandas as pd
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 
 
 def setup_output_dirs(out_basedir, mkdirs=['results', 'state',
@@ -243,3 +244,16 @@ def rescale_SMAP_PM2AM_chunk_wrap(lon_ind_start, lon_ind_end,
 
     return PM_rescaled_chunk
 
+
+def add_gridlines(axis,
+                  xlocs=[-150, -100, -50, 0,
+                         50, 100, 150],
+                  ylocs=[-80, -60, -40, -20, 0, 20, 40, 60, 80],
+                  alpha=1):
+    gl = axis.gridlines(draw_labels=True, xlocs=xlocs, ylocs=ylocs,
+                        alpha=alpha)
+    gl.xlabels_top = False
+    gl.ylabels_right = False
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    return gl

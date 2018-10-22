@@ -16,7 +16,7 @@ from utils import setup_output_dirs
 # Parameter setting
 # ========================================== #
 # Original IMERG nc
-gpm_nc = '/civil/hydro/ymao/smap_data/tools/prepare_GPM/output/L3_Final_global.12hour.36km/prec.20150101_20171231.nc'
+gpm_nc = '/civil/hydro/ymao/smap_data/tools/prepare_GPM/output/L3_Final_global.12hour.36km/prec.20150401_20180331.nc'
 # SMAP domain nc
 domain_nc = '/civil/hydro/ymao/smap_data/param/domain/smap.domain.global.nc'
 
