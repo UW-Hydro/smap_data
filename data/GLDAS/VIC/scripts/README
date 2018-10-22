@@ -1,0 +1,14 @@
+Steps of downloading/processing GLDAS data:
+1. download.py - download raw 1-deg, 3-hourly data (in grb)
+
+2. process_data.py - convert grb to netCDF files; one file per 3-hourly timestep
+
+3. concatenate_data.py - Concatenate 3-hourly netCDF files into one file
+
+4. extract_variables.py - Extract and process surface SM, precipitation and SWE variables - output 3-hourly data
+
+5. aggregate_temporal_12H.py - Aggregate SM and PREC data to 12H temporal resolution (6AM & 6PM UTC)
+
+6. downsample_SM.py - Downsample 12H SM data (6AM & 6PM UTC) to specified temporal resolution (e.g., 3D); the original 12H timestamps are preserved
+
+7. downsample_SM_SMAP_freq.py - Downsample 12H SM data to SMAP temporal resolution (NOTE: data gaps are not strictly the same as SMAP gaps, since SMAP is in local solar time while GLDAS is in UTC); the original 12H timestamps are preserved
