@@ -71,6 +71,10 @@ if X_version == 'v1':
     n_coef = 2
 elif X_version == 'v2':
     n_coef = 3
+elif X_version == 'v3':
+    n_coef = 4
+elif X_version == 'v4':
+    n_coef = 3
 
 
 # ======================================= #
@@ -109,10 +113,11 @@ print('Plotting R2...')
 fig = plt.figure(figsize=(12, 5))
 # Set projection
 ax = plt.axes(projection=ccrs.PlateCarree())
-gl = add_gridlines(ax, alpha=0)
+ax.set_extent([-180, 180, -85, 85], ccrs.Geodetic())
 ax.add_feature(cartopy.feature.LAND,
-           facecolor=[1, 1, 1],
-           edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
+               facecolor=[1, 1, 1],
+               edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
+gl = add_gridlines(ax, alpha=0)
 # Plot
 cs = da_R2.where(da_domain==1).plot.pcolormesh(
     'lon', 'lat', ax=ax,
@@ -123,8 +128,14 @@ cs = da_R2.where(da_domain==1).plot.pcolormesh(
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='min')
 cbar.set_label('$R^2$', fontsize=20)
-plt.title('$R^2$ (domain-median = {:.2f})'.format(
-    da_R2.where(da_domain==1).median().values), fontsize=20)
+#plt.title('$R^2$', fontsize=20)
+# Insert pdf plot
+a = plt.axes([0.16, 0.3, 0.12, 0.2])
+data_all = da_R2.values.flatten()
+data_all = data_all[~np.isnan(data_all)]
+cs = plt.hist(data_all, bins=20, density=True, color='gray')
+plt.xlabel('$R^2$', fontsize=14)
+plt.title('PDF', fontsize=14)
 # Save fig
 fig.savefig(
     os.path.join(
@@ -141,10 +152,11 @@ print('Plotting RMSE...')
 fig = plt.figure(figsize=(12, 5))
 # Set projection
 ax = plt.axes(projection=ccrs.PlateCarree())
-gl = add_gridlines(ax, alpha=0)
+ax.set_extent([-180, 180, -85, 85], ccrs.Geodetic())
 ax.add_feature(cartopy.feature.LAND,
-           facecolor=[1, 1, 1],
-           edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
+               facecolor=[1, 1, 1],
+               edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
+gl = add_gridlines(ax, alpha=0)
 # Plot
 cs = da_RMSE.where(da_domain==1).plot.pcolormesh(
     'lon', 'lat', ax=ax,
@@ -155,8 +167,15 @@ cs = da_RMSE.where(da_domain==1).plot.pcolormesh(
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='max')
 cbar.set_label('RMSE (mm/mm / hour)', fontsize=20)
-plt.title('RMSE (domain-median = {:.4f})'.format(
-    da_RMSE.where(da_domain==1).median().values), fontsize=20)
+#plt.title('RMSE (domain-median = {:.4f})'.format(
+#    da_RMSE.where(da_domain==1).median().values), fontsize=20)
+# Insert pdf plot
+a = plt.axes([0.16, 0.3, 0.12, 0.2])
+data_all = da_RMSE.values.flatten()
+data_all = data_all[~np.isnan(data_all)]
+cs = plt.hist(data_all, bins=20, density=True, color='gray')
+plt.xlabel('RMSE\n(mm/mm / hour)', fontsize=14)
+plt.title('PDF', fontsize=14)
 # Save fig
 fig.savefig(
     os.path.join(
@@ -176,6 +195,7 @@ for i in range(n_coef):
     # Set projection
     ax = plt.axes(projection=ccrs.PlateCarree())
     gl = add_gridlines(ax, alpha=0)
+    ax.set_extent([-180, 180, -85, 85], ccrs.Geodetic())
     ax.add_feature(cartopy.feature.LAND,
                facecolor=[1, 1, 1],
                edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
@@ -195,6 +215,13 @@ for i in range(n_coef):
     cbar = plt.colorbar(cs, extend='both')
     cbar.set_label(r'$\beta${}'.format(i+1), fontsize=20)
     plt.title(r'Fitted coef $\beta${}'.format(i+1), fontsize=20)
+    # Insert pdf plot
+    a = plt.axes([0.16, 0.3, 0.12, 0.2])
+    data_all = list_coef[i].values.flatten()
+    data_all = data_all[~np.isnan(data_all)]
+    cs = plt.hist(data_all, bins=20, density=True, color='gray')
+    plt.xlabel(r'$\beta${}'.format(i+1), fontsize=14)
+    plt.title('PDF', fontsize=14)
     # Save fig
     fig.savefig(
         os.path.join(
@@ -209,6 +236,7 @@ beta1 = - list_coef[0] * 24  # convert to [day-1]
 fig = plt.figure(figsize=(12, 5))
 # Set projection
 ax = plt.axes(projection=ccrs.PlateCarree())
+ax.set_extent([-180, 180, -85, 85], ccrs.Geodetic())
 gl = add_gridlines(ax, alpha=0)
 ax.add_feature(cartopy.feature.LAND,
                facecolor=[1, 1, 1],
@@ -218,12 +246,20 @@ cs = beta1.where(da_domain==1).plot.pcolormesh(
     'lon', 'lat', ax=ax,
     add_colorbar=False,
     add_labels=False,
-    cmap='PuBuGn',
+    cmap='plasma',
     vmin=0, vmax=0.6,
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='both')
-cbar.set_label(r'${\beta}_1$ ' + r'$(day^-1)$', fontsize=20)
-plt.title('Loss function linear slope', fontsize=20)
+cbar.set_label(r'${\beta}_1$ ' + r'$(day^{-1})$', fontsize=20)
+#plt.title('Loss function linear slope', fontsize=20)
+# Insert pdf plot
+a = plt.axes([0.16, 0.3, 0.12, 0.2])
+data_all = beta1.values.flatten()
+data_all = data_all[~np.isnan(data_all)]
+cs = plt.hist(data_all, bins=20, range=(0, 0.6),
+              density=True, color='gray')
+plt.xlabel(r'${\beta}_1$ ' + r'$(day^{-1})$', fontsize=14)
+plt.title('PDF', fontsize=14)
 # Save fig
 fig.savefig(
     os.path.join(
@@ -236,6 +272,7 @@ tau = - 1 / (list_coef[0] * 24)  # [day]
 fig = plt.figure(figsize=(12, 5))
 # Set projection
 ax = plt.axes(projection=ccrs.PlateCarree())
+ax.set_extent([-180, 180, -85, 85], ccrs.Geodetic())
 gl = add_gridlines(ax, alpha=0)
 ax.add_feature(cartopy.feature.LAND,
                facecolor=[1, 1, 1],
@@ -245,12 +282,20 @@ cs = tau.where(da_domain==1).plot.pcolormesh(
     'lon', 'lat', ax=ax,
     add_colorbar=False,
     add_labels=False,
-    cmap='YlGnBu',
-    vmin=0, vmax=20,
+    cmap='plasma_r',
+    vmin=0, vmax=40,
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='both')
 cbar.set_label(r'${\tau}$ ' + '(day)', fontsize=20)
-plt.title('SM exponential decay e-folding time scale', fontsize=20)
+#plt.title('SM exponential decay e-folding time scale', fontsize=20)
+# Insert pdf plot
+a = plt.axes([0.16, 0.3, 0.12, 0.2])
+data_all = tau.values.flatten()
+data_all = data_all[~np.isnan(data_all)]
+cs = plt.hist(data_all, bins=20, range=(0, 100),
+              density=True, color='gray')
+plt.xlabel(r'${\tau}$ ' + '(day)', fontsize=14)
+plt.title('PDF', fontsize=14)
 # Save fig
 fig.savefig(
     os.path.join(
@@ -266,6 +311,7 @@ P_frac = list_coef[1] * 50  # convert from [mm-1] to [-]
 fig = plt.figure(figsize=(12, 5))
 # Set projection
 ax = plt.axes(projection=ccrs.PlateCarree())
+ax.set_extent([-180, 180, -85, 85], ccrs.Geodetic())
 gl = add_gridlines(ax, alpha=0)
 ax.add_feature(cartopy.feature.LAND,
                facecolor=[1, 1, 1],
@@ -275,14 +321,22 @@ cs = P_frac.where(da_domain==1).plot.pcolormesh(
     'lon', 'lat', ax=ax,
     add_colorbar=False,
     add_labels=False,
-    cmap='PuBuGn',
+    cmap='plasma_r',
     vmin=0, vmax=1,
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='both')
 cbar.set_label('Fraction (-)', fontsize=20)
-plt.title('Fraction of P flux reflected in the surface-layer SM\n'
-          '(if P*SM presents, this interpretation is for when SM=0)',
-          fontsize=20)
+#plt.title('Fraction of P flux reflected in the surface-layer SM\n'
+#          '(if P*SM presents, this interpretation is for when SM=0)',
+#          fontsize=20)
+# Insert pdf plot
+a = plt.axes([0.16, 0.3, 0.12, 0.2])
+data_all = P_frac.values.flatten()
+data_all = data_all[~np.isnan(data_all)]
+cs = plt.hist(data_all, bins=20, range=(0, 2),
+              density=True, color='gray')
+plt.xlabel('Fraction (-)', fontsize=14)
+plt.title('PDF', fontsize=14)
 # Save fig
 fig.savefig(
     os.path.join(
@@ -293,12 +347,13 @@ fig.savefig(
 
 # --- Interpretation of beta 3 (SM*P) --- #
 # beta3 * 50mm - how much P_frac changes with SM level
-# only for X_v2
-if X_version == 'v2':
+# only for X_v2 or X_v3
+if X_version == 'v2' or X_version == 'v3':
     P_frac_with_SM = list_coef[2]  # convert from [-/mm]
     fig = plt.figure(figsize=(12, 5))
     # Set projection
     ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.set_extent([-180, 180, -85, 85], ccrs.Geodetic())
     gl = add_gridlines(ax, alpha=0)
     ax.add_feature(cartopy.feature.LAND,
                    facecolor=[1, 1, 1],
@@ -308,15 +363,23 @@ if X_version == 'v2':
         'lon', 'lat', ax=ax,
         add_colorbar=False,
         add_labels=False,
-        cmap='PuBuGn_r',
+        cmap='plasma',
         vmin=-0.2, vmax=0,
         transform=ccrs.PlateCarree())
     cbar = plt.colorbar(cs, extend='both')
     cbar.set_label('Sensitivity of fraction\nto SM level (-/mm)',
                    fontsize=20)
-    plt.title('Sensitivity of fraction of P flux (reflected \n'
-              'in the surface-layer SM) to SM level',
-              fontsize=20)
+#    plt.title('Sensitivity of fraction of P flux (reflected \n'
+#              'in the surface-layer SM) to SM level',
+#              fontsize=20)
+    # Insert pdf plot
+    a = plt.axes([0.16, 0.3, 0.12, 0.2])
+    data_all = P_frac_with_SM.values.flatten()
+    data_all = data_all[~np.isnan(data_all)]
+    cs = plt.hist(data_all, bins=20, range=(-0.5, 0),
+                  density=True, color='gray')
+    plt.xlabel('Sensitivity (-/mm)', fontsize=14)
+    plt.title('PDF', fontsize=14)
     # Save fig
     fig.savefig(
         os.path.join(
