@@ -196,6 +196,10 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
             x = [sm_last, prec]
         elif X_version == 'v2':
             x = [sm_last, prec, sm_last * prec]
+        elif X_version == 'v3':
+            x = [sm_last, prec, sm_last * prec, sm_last * sm_last]
+        elif X_version == 'v4':
+            x = [sm_last * sm_last, prec, sm_last * prec]
         else:
             raise ValueError('Input X_version = {} unrecognizable!'.format(X_version))
         X.append(x)
@@ -205,8 +209,8 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     X = np.asarray(X)
     times = pd.to_datetime(times)
 
-    # --- If there are <= 10 data points, discard this cell --- #
-    if len(Y) <= 150:
+    # --- If there are <= 100 data points, discard this cell --- #
+    if len(Y) <= 100:
         print('Too few valid data points for pixel {} {} - discard!'.format(lat_ind, lon_ind))
         return None
 
