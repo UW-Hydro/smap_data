@@ -17,7 +17,7 @@ from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 
 
 def regression_time_series_wrap(run_pixel, lat_ind, lon_ind, ts_smap, ts_prec,
-                                regression_type, X_version, **kwargs):
+                                regression_type, X_version, seed, **kwargs):
     ''' A wrap function that extract a single pixel and perform Lasso regression
 
     Parameters
@@ -35,6 +35,8 @@ def regression_time_series_wrap(run_pixel, lat_ind, lon_ind, ts_smap, ts_prec,
     regression_type: <string>
         Options: linear; lasso
     X_version: <str>
+    seed: <int>
+        Random seed for the ts
 
     Returns
     ----------
@@ -45,7 +47,7 @@ def regression_time_series_wrap(run_pixel, lat_ind, lon_ind, ts_smap, ts_prec,
     if run_pixel == 1:
         print(lat_ind, lon_ind)
         dict_results_ts = regression_time_series(
-            lat_ind, lon_ind, ts_smap, ts_prec, regression_type, X_version, **kwargs)
+            lat_ind, lon_ind, ts_smap, ts_prec, regression_type, X_version, seed, **kwargs)
     else:
         print(lat_ind, lon_ind, 'skip')
         dict_results_ts = None
@@ -55,7 +57,7 @@ def regression_time_series_wrap(run_pixel, lat_ind, lon_ind, ts_smap, ts_prec,
 
 def regression_time_series_chunk_wrap(lon_ind_start, lon_ind_end,
                                       da_domain_chunk, da_smap_chunk, da_prec_chunk,
-                                      regression_type, X_version, **kwargs):
+                                      regression_type, X_version, seed_chunk, **kwargs):
     ''' Wrapping function for running a whole longitude chunk of pixels
         - Lasso regression of SMAP and GPM data for each pixel
     
@@ -74,6 +76,8 @@ def regression_time_series_chunk_wrap(lon_ind_start, lon_ind_end,
     regression_type: <string>
         Options: linear; lasso
     X_version: <str>
+    seed_chunk: <int>
+        Random seed for the chunk
 
     Returns
     ----------
@@ -94,6 +98,8 @@ def regression_time_series_chunk_wrap(lon_ind_start, lon_ind_end,
             da_prec_chunk[:, lat_ind, lon_ind].to_series(),
             regression_type,
             X_version,
+            seed_chunk * 10000 + (lat_ind * len(da_domain_chunk['lon']) + lon_ind),  # ensure the seeds here are different
+                                                                                     #for close-by seed_chunk
             **kwargs)
         for lat_ind in range(len(da_domain_chunk['lat']))
         for lon_ind in range(len(da_domain_chunk['lon']))]
@@ -112,7 +118,7 @@ def regression_time_series_chunk_wrap(lon_ind_start, lon_ind_end,
 
 
 def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
-                           regression_type, X_version, **kwargs):
+                           regression_type, X_version, seed, **kwargs):
     ''' Lasso regression on a time series of SMAP and GPM data for one pixel
     
     Parameters
@@ -130,12 +136,17 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     X_version: <str>
         # v1: [SM, P]
         # v2: [SM, P, SM*P]
+    seed: <int>
+        Random seed
 
     ### **kwargs ###
     alpha: <float> (only needed if regression_type = lasso or ridge)
         alpha paramter in Lasso fitting
     standardize: <bool>
         Whether to standardize X and center Y; default: True
+    cross_vali: <bool>
+        If true, return averaged evaluation scores from k-fold cross-validation
+        If false, return evaluation scores over the entire dataset (that is also used for fitting)
 
     Returns
     ----------
@@ -279,11 +290,49 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     model = reg.fit(X, Y)
 
     # --- Calculate statistics --- #
-    Y_pred = model.predict(X)
-    # R2
-    R2 = r2_score(Y, Y_pred)
-    # RMSE
-    RMSE = rmse(Y, Y_pred)
+    # 1) If cross_vali is False, directly calculate stats on the entire dataset (that is also used for fitting)
+    if kwargs['cross_vali'] is False:
+        Y_pred = model.predict(X)
+        # R2
+        R2_final = r2_score(Y, Y_pred)
+        # RMSE
+        RMSE_final = rmse(Y, Y_pred)
+    # 2) If cross_vali is True, run cross validation
+    # NOTE: the returned model coefficients are still fitted on the ENTIRE dataset!!!
+    # Only the evaluation stats are from cross-validataion
+    else:
+        n = len(Y)  # Total number of data points
+        k_fold = kwargs['k_fold']
+        # --- Calculate size of training and validation sets --- #
+        n_vali_approx = int(n / k_fold)
+        # --- Loop over each fold --- #
+        list_R2_vali = []
+        list_rmse_vali = []
+        for k in range(k_fold):
+            # Shuffle data
+            ind = np.arange(n)
+            rng = np.random.RandomState(seed+k)
+            rng.shuffle(ind)  # Shuffle indices
+            ind_vali = ind[:n_vali_approx]
+            ind_train = ind[n_vali_approx:]
+            # Extract training and validation data
+            X_train = X[ind_train, :]
+            Y_train = Y[ind_train]
+            X_vali = X[ind_vali, :]
+            Y_vali = Y[ind_vali]
+            # Run regression on training set
+            model = reg.fit(X, Y)
+            # Calculate statistics on validation set
+            Y_pred_vali = model.predict(X_vali)
+            ### R2
+            R2_vali = r2_score(Y_vali, Y_pred_vali)
+            list_R2_vali.append(R2_vali)
+            ### RMSE
+            rmse_vali = rmse(Y_vali, Y_pred_vali)
+            list_rmse_vali.append(rmse_vali)
+        # --- Average stats calculatd from all folds --- #
+        R2_final = np.mean(list_R2_vali)
+        RMSE_final = np.mean(list_rmse_vali)
 
     # --- If standardize X, convert fitted coefficients back to the original X regime --- #
     if kwargs['standardize'] is True:
@@ -302,8 +351,8 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     # --- Put final results in dict --- #
     dict_results_ts = {}
     dict_results_ts['model'] = model
-    dict_results_ts['R2'] = R2
-    dict_results_ts['RMSE'] = RMSE
+    dict_results_ts['R2'] = R2_final
+    dict_results_ts['RMSE'] = RMSE_final
     if kwargs['standardize'] is True:
         dict_results_ts['intercept'] = intercept
         dict_results_ts['X_std'] = X_std

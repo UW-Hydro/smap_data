@@ -12,6 +12,7 @@ import numpy as np
 from sklearn import linear_model
 import pickle
 from joblib import Parallel, delayed
+import subprocess
 import timeit
 
 from tonic.io import read_config, read_configobj
@@ -23,6 +24,15 @@ from sm_utils import regression_time_series_chunk_wrap
 # ========================================= #
 cfg = read_configobj(sys.argv[1])
 nproc = int(sys.argv[2])
+
+
+# ========================================= #
+# Set random generation seed
+# ========================================= #
+if 'RANDOM' in cfg:
+    np.random.seed(cfg['RANDOM']['seed'])
+else:
+    raise ValueError('Input a random seed in the cfg file (even if no randomness is in the analysis)')
 
 
 # ========================================= #
@@ -50,8 +60,7 @@ output_dir = cfg['OUTPUT']['output_dir']
 # ========================================= #
 # Output data dir
 output_data_dir = os.path.join(output_dir, 'data')
-if not os.path.exists(output_data_dir):
-    os.makedirs(output_data_dir)
+subprocess.call("mkdir -p {}".format(output_data_dir), shell=True)
 
 
 # ========================================= #
@@ -71,6 +80,14 @@ elif regression_type == 'lasso' or regression_type == 'ridge':
               'standardize': standardize}
 else:
     raise ValueError('Input regression_type = {} not recognizable!'.format(regression_type))
+# Cross validation
+if 'cross_vali' in cfg['REGRESSION'] and cfg['REGRESSION']['cross_vali'] is True:
+    cross_vali = True
+    kwargs['k_fold'] = cfg['REGRESSION']['k_fold']
+else:
+    cross_vali = False
+kwargs['cross_vali'] = cross_vali
+seed_chunk_base = np.random.randint(low=10000)
 
 # --- Chunk the global dataset to 5-pixel-longitude chunks for multiprocessing --- #
 lon_int_interval = 5
@@ -83,6 +100,7 @@ results = Parallel(n_jobs=nproc)(delayed(regression_time_series_chunk_wrap)(
     da_prec[:, :, lon_ind_start:((lon_ind_start + lon_int_interval) if (lon_ind_start + lon_int_interval) <= nlon else nlon)],
     cfg['REGRESSION']['regression_type'],
     X_version,
+    seed_chunk_base + int(lon_ind_start / lon_int_interval),
     **kwargs)
     for lon_ind_start in np.arange(0, nlon, lon_int_interval)) # [n_chunks: {latind_lonind: dict_results}]
 
