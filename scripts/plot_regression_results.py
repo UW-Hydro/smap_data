@@ -133,7 +133,7 @@ cbar.set_label('$R^2$', fontsize=20)
 a = plt.axes([0.16, 0.3, 0.12, 0.2])
 data_all = da_R2.values.flatten()
 data_all = data_all[~np.isnan(data_all)]
-cs = plt.hist(data_all, bins=20, density=True, color='gray')
+cs = plt.hist(data_all, bins=20, density=True, color='gray', range=(0, 1))
 plt.xlabel('$R^2$', fontsize=14)
 plt.title('PDF', fontsize=14)
 # Save fig
@@ -246,7 +246,7 @@ cs = beta1.where(da_domain==1).plot.pcolormesh(
     'lon', 'lat', ax=ax,
     add_colorbar=False,
     add_labels=False,
-    cmap='plasma',
+    cmap='Spectral_r',
     vmin=0, vmax=0.6,
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='both')
@@ -282,7 +282,7 @@ cs = tau.where(da_domain==1).plot.pcolormesh(
     'lon', 'lat', ax=ax,
     add_colorbar=False,
     add_labels=False,
-    cmap='plasma_r',
+    cmap='Spectral',
     vmin=0, vmax=40,
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='both')
@@ -305,9 +305,9 @@ fig.savefig(
 
 
 # --- Interpretation of beta 2 (P) --- #
-# beta2 * 50mm - fraction of P flux that is added to the top 5cm soil
+# beta2 * depth [mm] - fraction of P flux that is added to the top 5cm soil
 # (if P*SM presents, this interpretation is for when SM=0)
-P_frac = list_coef[1] * 50  # convert from [mm-1] to [-]
+P_frac = list_coef[1] * cfg['PLOT']['soil_depth']  # convert from [mm-1] to [-]
 fig = plt.figure(figsize=(12, 5))
 # Set projection
 ax = plt.axes(projection=ccrs.PlateCarree())
@@ -321,7 +321,7 @@ cs = P_frac.where(da_domain==1).plot.pcolormesh(
     'lon', 'lat', ax=ax,
     add_colorbar=False,
     add_labels=False,
-    cmap='plasma_r',
+    cmap='Spectral',
     vmin=0, vmax=1,
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='both')
@@ -333,7 +333,7 @@ cbar.set_label('Fraction (-)', fontsize=20)
 a = plt.axes([0.16, 0.3, 0.12, 0.2])
 data_all = P_frac.values.flatten()
 data_all = data_all[~np.isnan(data_all)]
-cs = plt.hist(data_all, bins=20, range=(0, 2),
+cs = plt.hist(data_all, bins=20, range=(0, 1),
               density=True, color='gray')
 plt.xlabel('Fraction (-)', fontsize=14)
 plt.title('PDF', fontsize=14)
@@ -346,7 +346,7 @@ fig.savefig(
 
 
 # --- Interpretation of beta 3 (SM*P) --- #
-# beta3 * 50mm - how much P_frac changes with SM level
+# beta3 - how much P_frac changes with SM level
 # only for X_v2 or X_v3
 if X_version == 'v2' or X_version == 'v3':
     P_frac_with_SM = list_coef[2]  # convert from [-/mm]
@@ -363,7 +363,7 @@ if X_version == 'v2' or X_version == 'v3':
         'lon', 'lat', ax=ax,
         add_colorbar=False,
         add_labels=False,
-        cmap='plasma',
+        cmap='Spectral',
         vmin=-0.2, vmax=0,
         transform=ccrs.PlateCarree())
     cbar = plt.colorbar(cs, extend='both')
