@@ -6,3 +6,5 @@ Steps of preparing GPM data:
 
 3. aggregate_GPM_12hour.py - aggregate 30 min, 36 kim GPM to 12-hour (SMAP local solar time intervals), 36 km
 
+4. concat_GPM_12hour.py - concatenate 12-hour GPM
+

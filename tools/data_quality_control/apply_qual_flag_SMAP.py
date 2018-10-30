@@ -22,7 +22,7 @@ from utils import setup_output_dirs
 #smap_nc = '/civil/hydro/ymao/smap_data/tools/data_quality_control/output/data/smap.PM_rescaled.20150331_20171231.nc'
 smap_nc = '/civil/hydro/ymao/smap_data/tools/data_quality_control/output/data/smap.exclude_constant.20150401_20180331.nc'
 # SMAP quality control flag nc
-smap_qual_flag_nc = '/civil/hydro/ymao/smap_data/tools/prepare_SMAP/output/data/soil_moisture.20150331_20180930.nc'
+smap_qual_flag_nc = '/civil/hydro/ymao/smap_data/tools/prepare_SMAP/output/data/soil_moisture.20150401_20180331.nc'
 # SMAP domain nc
 domain_nc = '/civil/hydro/ymao/smap_data/param/domain/smap.domain.global.nc'
 
