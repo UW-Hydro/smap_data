@@ -1,0 +1,12 @@
+Steps of downloading/processing GLDAS data:
+
+NOTE: Currently must input full calendar years!!! e.g., 197901 201712
+
+1. download.py - download raw 1-deg, monthly data (in grb)
+
+2. process_data.py - convert grb to netCDF files; one file per monthly timestep
+
+3. concatenate_data.py - Concatenate 3-hourly netCDF files into one file
+
+4. extract_variables_annual.py - Extract and process surface SM, precipitation, air temperature and SWE variables - convert and output mean annual climatology data
+
