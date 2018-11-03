@@ -58,6 +58,18 @@ da_gpm[:] = prec
 
 
 # ========================================== #
+# Exclude pixels where >= 30% of the IMERG timesteps are NAN
+# ========================================== #
+# Percentage of missing timesteps for each pixel
+da_missing_fraction = \
+    np.isnan(da_gpm).sum(dim='time') / len(da_gpm['time'])
+# Set all values to NAN for pixels with >=50% missing timesteps
+prec = da_gpm.values
+prec[:, da_missing_fraction>=0.3] = np.nan
+da_gpm[:] = prec
+
+
+# ========================================== #
 # Save to file
 # ========================================== #
 # --- Save new GPM data to file --- #

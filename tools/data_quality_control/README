@@ -16,7 +16,6 @@ Data quality control steps:
 # --- IMERG quality control --- #
 1. quality_control_GPM.py
     1) Exclude all-zero-precipitation pixels
-
-
+    2) Exclude pixels where >= 30% of the IMERG timesteps are NAN
 
 
