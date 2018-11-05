@@ -163,7 +163,7 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
             resid: <np.array>
                 Residual time series from the fitting
     '''
-    
+
     # --- Put SMAP and prec into a df --- #
     ts_prec = ts_prec.truncate(before=ts_smap.index[0],
                                after=ts_smap.index[-1])
@@ -189,10 +189,11 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
         if smap_ind[i] - smap_ind[i-1] > 10:
             continue
         # --- Discard this timestep if precipitation data contains NAN
-        # Calculate cumulative precipitation (NOTE: prec is time-beginning timestamp
-        prec_sum = df.iloc[smap_ind[i-1]:smap_ind[i], :]['prec'].sum()  # [mm]
-        if np.isnan(prec_sum) is True:  # Discard timesteps with NAN precipitation data
+        s_prec_step = df['prec'].iloc[smap_ind[i-1]:smap_ind[i]]
+        if s_prec_step.isnull().any():  # Discard timesteps with NAN precipitation data
             continue
+        # Calculate cumulative precipitation (NOTE: prec is time-beginning timestamp
+        prec_sum = s_prec_step.sum()  # [mm]
 
         # --- Calculate Y and X elements --- #
         dt = (smap_ind[i] - smap_ind[i-1]) * 12  # delta t [hour]
