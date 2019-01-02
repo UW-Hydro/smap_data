@@ -119,8 +119,8 @@ da_prec.close()
 # ======================================= #
 # --- Sahara --- #
 # 1) with very little P; P and SM*P highly correlated
-lat_ind = 281
-lon_ind = 555
+lat_ind = 285
+lon_ind = 545
 
 # --- Extract time series --- #
 ts_smap = da_smap[:, lat_ind, lon_ind].to_series()

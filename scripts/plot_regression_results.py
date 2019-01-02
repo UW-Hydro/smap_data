@@ -289,11 +289,12 @@ cbar = plt.colorbar(cs, extend='both')
 cbar.set_label(r'${\tau}$ ' + '(day)', fontsize=20)
 #plt.title('SM exponential decay e-folding time scale', fontsize=20)
 # Insert pdf plot
-a = plt.axes([0.16, 0.3, 0.12, 0.2])
+a = plt.axes([0.17, 0.3, 0.12, 0.2])
 data_all = tau.values.flatten()
 data_all = data_all[~np.isnan(data_all)]
 cs = plt.hist(data_all, bins=20, range=(0, 100),
               density=True, color='gray')
+plt.ylim([0, 0.06])
 plt.xlabel(r'${\tau}$ ' + '(day)', fontsize=14)
 plt.title('PDF', fontsize=14)
 # Save fig
@@ -325,7 +326,7 @@ cs = P_frac.where(da_domain==1).plot.pcolormesh(
     vmin=0, vmax=1,
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='both')
-cbar.set_label('Fraction (-)', fontsize=20)
+cbar.set_label(r'${\beta}_2$ ' + '(-)', fontsize=20)
 #plt.title('Fraction of P flux reflected in the surface-layer SM\n'
 #          '(if P*SM presents, this interpretation is for when SM=0)',
 #          fontsize=20)
@@ -335,7 +336,8 @@ data_all = P_frac.values.flatten()
 data_all = data_all[~np.isnan(data_all)]
 cs = plt.hist(data_all, bins=20, range=(0, 1),
               density=True, color='gray')
-plt.xlabel('Fraction (-)', fontsize=14)
+plt.ylim([0, 4])
+plt.xlabel(r'${\beta}_2$ ' + '(-)', fontsize=14)
 plt.title('PDF', fontsize=14)
 # Save fig
 fig.savefig(
@@ -367,7 +369,7 @@ if X_version == 'v2' or X_version == 'v3':
         vmin=-0.2, vmax=0,
         transform=ccrs.PlateCarree())
     cbar = plt.colorbar(cs, extend='both')
-    cbar.set_label('Sensitivity of fraction\nto SM level (-/mm)',
+    cbar.set_label(r'${\gamma}_3$ ' + '(-/mm)',
                    fontsize=20)
 #    plt.title('Sensitivity of fraction of P flux (reflected \n'
 #              'in the surface-layer SM) to SM level',
@@ -378,7 +380,8 @@ if X_version == 'v2' or X_version == 'v3':
     data_all = data_all[~np.isnan(data_all)]
     cs = plt.hist(data_all, bins=20, range=(-0.5, 0),
                   density=True, color='gray')
-    plt.xlabel('Sensitivity (-/mm)', fontsize=14)
+    plt.ylim([0, 30])
+    plt.xlabel(r'${\gamma}_3$ ' + '(-/mm)', fontsize=14)
     plt.title('PDF', fontsize=14)
     # Save fig
     fig.savefig(
