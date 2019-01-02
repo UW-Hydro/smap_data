@@ -63,9 +63,21 @@ da_gpm[:] = prec
 # Percentage of missing timesteps for each pixel
 da_missing_fraction = \
     np.isnan(da_gpm).sum(dim='time') / len(da_gpm['time'])
-# Set all values to NAN for pixels with >=50% missing timesteps
+# Set all values to NAN for pixels with >=30% missing timesteps
 prec = da_gpm.values
 prec[:, da_missing_fraction>=0.3] = np.nan
+da_gpm[:] = prec
+
+
+# ========================================== #
+# Exclude pixels where < 10% of the IMERG timesteps are nonzero
+# (this criteria mainly excludes eastern Sahara and part of Arabian Penninsular, but not much other areas)
+# ========================================== #
+# Percentage of raining timesteps for each pixel
+da_prec_frac = (da_gpm>0).sum(dim='time') / len(da_gpm['time'])  # [lat, lon]
+# Set all values to NAN for pixels with <10% raining timesteps
+prec = da_gpm.values
+prec[:, da_prec_frac<0.1] = np.nan
 da_gpm[:] = prec
 
 
@@ -77,7 +89,7 @@ print('Save to file...')
 ds_gpm_new = xr.Dataset({'PREC': da_gpm})
 ds_gpm_new.to_netcdf(
     os.path.join(output_dir,
-                 'prec.qc.{}_{}.nc'.format(
+                 'prec.qc_exclude_arid.{}_{}.nc'.format(
                     start_time.strftime('%Y%m%d'),
                     end_time.strftime('%Y%m%d'))),
     format='NETCDF4_CLASSIC')

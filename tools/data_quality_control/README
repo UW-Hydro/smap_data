@@ -17,5 +17,6 @@ Data quality control steps:
 1. quality_control_GPM.py
     1) Exclude all-zero-precipitation pixels
     2) Exclude pixels where >= 30% of the IMERG timesteps are NAN
-
+    3) Exclude pixels where < 10% of the IMERG timesteps are nonzero
+       (this criteria mainly excludes eastern Sahara and part of Arabian Penninsular, but not much other areas)
 
