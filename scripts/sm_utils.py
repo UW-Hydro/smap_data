@@ -246,13 +246,7 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
         elif X_version == 'v2':
             list_deleted_columns.append(1)
             list_deleted_columns.append(2)
-    # 2) If precip > 0 timestep < 10%, only keep one P term to be stable
-    elif (X_prec>0).sum() / len(X_prec) < 0.1:
-        print('Precipitation > 0 timesteps fewer than 10% for pixel {} {} - only keep one P term'.format(
-            lat_ind, lon_ind))
-        if X_version == 'v2':
-            list_deleted_columns.append(2)
-    # 3) If two variables in X are hightly correlated, drop the latter
+    # 2) If two variables in X are hightly correlated, drop the latter
     for i in range(n_coef-1):
         for j in range(i+1, n_coef):
             if(np.corrcoef(X[:, i], X[:, j])[0, 1] >= 0.98):
