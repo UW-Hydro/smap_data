@@ -24,3 +24,23 @@ def find_1deg_grid_gldas(lat, lon):
     lon_grid = np.around(lon-0.5) + 0.5
     return lat_grid, lon_grid
 
+
+def edges_from_centers(centers):
+    ''' Return an array of grid edge values from grid center values - note: min and max edge are hardcoded as 0 and 1000
+    Parameters
+    ----------
+    centers: <np.array>
+        A 1-D array of grid centers. Typically grid-center lats or lons. Dim: [n]
+
+    Returns
+    ----------
+    edges: <np.array>
+        A 1-D array of grid edge values. Dim: [n+1]
+    '''
+
+    edges = np.zeros(len(centers)+1)
+    edges[1:-1] = (centers[:-1] + centers[1:]) / 2
+    edges[0] = 0
+    edges[-1] = 1000
+
+    return edges
