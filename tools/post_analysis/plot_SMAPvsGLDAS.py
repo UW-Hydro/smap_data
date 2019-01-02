@@ -10,7 +10,7 @@ import matplotlib.gridspec as gridspec
 from sklearn.neighbors import NearestNeighbors
 
 from tonic.io import read_config, read_configobj
-from utils import calc_monthly_PET, find_1deg_grid_gldas
+from utils import calc_monthly_PET, find_1deg_grid_gldas, edges_from_centers
 
 
 # ========================================= #
@@ -20,14 +20,14 @@ from utils import calc_monthly_PET, find_1deg_grid_gldas
 dict_cfg = {}
 for v in ['v1', 'v2']:
     dict_cfg['SMAP_{}'.format(v)] = read_configobj(
-        '/civil/hydro/ymao/smap_data/scripts/cfg/20181103.SMAP_recom_qual.exclude_gpm_arctic/'
+        '/civil/hydro/ymao/smap_data/scripts/cfg/20181121.SMAP_recom_qual.exclude_arid/'
         'X_{}.linear.cfg'.format(v))
     dict_cfg['GLDAS_{}'.format(v)] = read_configobj(
-        '/civil/hydro/ymao/smap_data/scripts/cfg/20181103.GLDAS_VIC.exclude_gpm_arctic/smap_freq/'
+        '/civil/hydro/ymao/smap_data/scripts/cfg/20181121.GLDAS_VIC.exclude_arid/smap_freq/'
         'X_{}.linear.cfg'.format(v))
     
 # Output data dir
-output_dir = 'output/20181103.smap_gldas'
+output_dir = 'output/20181121.smap_gldas'
 
 # --- Load GLDAS monthly data --- #
 ds_monthly = xr.open_dataset(
@@ -175,7 +175,7 @@ ylim = {0: [0, 100],
         2: [-0.2, 0.02]}
 # ylabel for each coef
 ylabel = {0: r'$\tau$ (day)',
-          1: '$P_f$ (-)',
+          1: r'$\beta_2$ (-)',
           2: r'$\gamma_3$ (-/mm)'}
 # color for SMAP/GLDAS
 color = {'SMAP': 'darkorange',
@@ -189,13 +189,14 @@ show_xlabel = {'v1_0': False,
 
 # --- X axis bin edges --- #
 # Xticks
-xticks = np.concatenate(
-    [np.arange(0, 3, 0.2),
-     np.array([3, 5, 10, 20, 30, 500])])
-xticks = np.delete(xticks, 0)
+xticks = np.array([
+    0.4, 0.6, 0.8, 1,
+    1.2, 1.4, 1.6, 1.8, 2,
+    2.2, 2.4, 2.6, 2.8,
+    3, 5, 10, 20, 30])
 # Indices of xticks to show
 xticks_to_show = np.array(
-    [0.2, 1, 2, 3, 10, 30])
+    [0.4, 1, 2, 3, 10, 30])
 last_tick = '>20'
 xticks_to_show_ind = [np.where(xticks==i)[0][0]
                       for i in xticks_to_show]
@@ -210,123 +211,129 @@ dict_bins_to_xticks = {}  # {bin: xtick}
 for i in range(len(xticks)):
     dict_bins_to_xticks[bins[i]] = xticks[i]
 
-for v in ['v1', 'v2']:
-    if v == 'v1':
-        n_coef = 2
-    elif v == 'v2':
-        n_coef = 3
-        
-    for i in range(n_coef):
-        # --- Plot --- #
-        fig = plt.figure(figsize=(8, 7))
-        # Create gridspec structure
-        gs = gridspec.GridSpec(
-            2, 1, height_ratios=[0.2, 0.8])
-        ax2 = plt.subplot(gs[1, 0])
-
-        # Extract coef and plot from both GLDAS and SMAP
-        dict_df_to_plot = {}
-        for data_source in ['SMAP', 'GLDAS']:
-            key = '{}_{}'.format(data_source, v)
-            # Extract coef and convert
-            coef_all = dict_list_coef[key][i].values.flatten()
-            # Convert coef
-            if i == 0:
-                coef_all = - 1 / (coef_all * 24)  # [day]
-            elif i == 1:
-                coef_all = coef_all * soil_depth[data_source]
-            # Put into df together with aridity
-            aridity_all = dict_da_aridity[data_source].values.flatten()
-            array = np.stack((aridity_all, coef_all),
-                             axis=1) # [n_pixel, 2]
-            df = pd.DataFrame(array, columns=['arid', 'coef'])
-            df = df.dropna()
-            # Bin to aridity and calculate median and 5th-95th quantile
-            ts_arid_bin = pd.cut(df['arid'], bins=bins)
-            ts_arid_xticks = \
-                [dict_bins_to_xticks[bin]
-                 for bin in ts_arid_bin]
-            df['arid'] = ts_arid_xticks
-            ts_median = df.groupby('arid').median()
-            ts_5th = df.groupby('arid').quantile(q=0.25)
-            ts_95th = df.groupby('arid').quantile(q=0.75)
-            ts_count = df.groupby('arid').count()  # Count of each bin
-            df_to_plot = pd.concat(
-                [ts_median, ts_5th, ts_95th, ts_count],
-                axis=1)
-            df_to_plot.columns = ['median', 'low', 'high', 'count']
-            # If any bin is empty, insert
-            for x in xticks:
-                if x not in df_to_plot.index:
-                    df_to_plot = df_to_plot.append(
-                        pd.Series({'median': 0,
-                                   'low': 0,
-                                   'high': 0,
-                                   'count': 0},
-                                  name=x))
-            df_to_plot = df_to_plot.sort_index()
-            # Put into dict
-            dict_df_to_plot[data_source] = df_to_plot
-            # Plot
-            ax2.plot(
-                range(len(df_to_plot)),
-                df_to_plot['median'].values,
-                color=color[data_source],
-                label=data_source)
-            ax2.fill_between(
-                range(len(df_to_plot)),
-                df_to_plot['low'].values,
-                df_to_plot['high'].values,
-                color=color[data_source], alpha=0.2)
-        # --- Make the plot look better --- #
-        if show_xlabel['{}_{}'.format(v, i)]:
-            # Set xticks
+# Plot both: SMAP only; SMAP & GLDAS
+for plot_gldas in [True, False]:
+    for v in ['v1', 'v2']:
+        if v == 'v1':
+            n_coef = 2
+        elif v == 'v2':
+            n_coef = 3
+            
+        for i in range(n_coef):
+            # --- Plot --- #
+            fig = plt.figure(figsize=(8, 7))
+            # Create gridspec structure
+            gs = gridspec.GridSpec(
+                2, 1, height_ratios=[0.2, 0.8])
+            ax2 = plt.subplot(gs[1, 0])
+    
+            # Extract coef and plot from both GLDAS and SMAP
+            dict_df_to_plot = {}
+            for data_source in ['SMAP', 'GLDAS']:
+                if plot_gldas is False and data_source == 'GLDAS':
+                    continue
+                key = '{}_{}'.format(data_source, v)
+                # Extract coef and convert
+                coef_all = dict_list_coef[key][i].values.flatten()
+                # Convert coef
+                if i == 0:
+                    coef_all = - 1 / (coef_all * 24)  # [day]
+                elif i == 1:
+                    coef_all = coef_all * soil_depth[data_source]
+                # Put into df together with aridity
+                aridity_all = dict_da_aridity[data_source].values.flatten()
+                array = np.stack((aridity_all, coef_all),
+                                 axis=1) # [n_pixel, 2]
+                df = pd.DataFrame(array, columns=['arid', 'coef'])
+                df = df.dropna()
+                # Bin to aridity and calculate median and 5th-95th quantile
+                ts_arid_bin = pd.cut(df['arid'], bins=bins)
+                ts_arid_xticks = \
+                    [dict_bins_to_xticks[bin]
+                     for bin in ts_arid_bin]
+                df['arid'] = ts_arid_xticks
+                ts_median = df.groupby('arid').median()
+                ts_5th = df.groupby('arid').quantile(q=0.25)
+                ts_95th = df.groupby('arid').quantile(q=0.75)
+                ts_count = df.groupby('arid').count()  # Count of each bin
+                df_to_plot = pd.concat(
+                    [ts_median, ts_5th, ts_95th, ts_count],
+                    axis=1)
+                df_to_plot.columns = ['median', 'low', 'high', 'count']
+                # If any bin is empty, insert
+                for x in xticks:
+                    if x not in df_to_plot.index:
+                        df_to_plot = df_to_plot.append(
+                            pd.Series({'median': 0,
+                                       'low': 0,
+                                       'high': 0,
+                                       'count': 0},
+                                      name=x))
+                df_to_plot = df_to_plot.sort_index()
+                # Put into dict
+                dict_df_to_plot[data_source] = df_to_plot
+                # Plot
+                ax2.plot(
+                    range(len(df_to_plot)),
+                    df_to_plot['median'].values,
+                    color=color[data_source],
+                    label=data_source)
+                ax2.fill_between(
+                    range(len(df_to_plot)),
+                    df_to_plot['low'].values,
+                    df_to_plot['high'].values,
+                    color=color[data_source], alpha=0.2)
+            # --- Make the plot look better --- #
             n_plot = len(dict_df_to_plot['SMAP'])
-            ax2.set_xticks(xticks_to_show_ind)
-            # Replace the last tick
-            ax2.set_xticklabels(
-                [i for i in xticks[xticks_to_show_ind][:-1]] + \
-                 [last_tick])
-            # xlabel
-            plt.xlabel('Aridity index (PET/P)', fontsize=16)
-        else:
-            ax2.get_xaxis().set_visible(False)
-        # xlim and ylim
-        plt.xlim([0, n_plot-1])
-        plt.ylim(ylim[i])
-        # labels
-        plt.ylabel(ylabel[i], fontsize=16)
-        ax2.tick_params(labelsize=14)
-        
-        # --- Add count subplot --- #
-        ax1 = plt.subplot(gs[0, 0])
-        ax1.bar(range(n_plot),
-                dict_df_to_plot['SMAP']['count'],
-                color='grey', width=0.8)
-        plt.xlim([0, n_plot-1])
-        ax1.tick_params(labelsize=14)
-        ax1.get_xaxis().set_visible(False)
-        
-        # --- Make plot look better --- #
-        fig.subplots_adjust(hspace=0.1)
-        
-        # Save figure
-        fig.savefig(
-            os.path.join(
-                output_plot_dir,
-                'SMAPvsGLDAS.X_{}.coef_{}.png'.format(v, i+1)),
-            format='png', dpi=150,
-            bbox_inches='tight', pad_inches=0)
-        
-# --- Get legend --- #
-fig = plt.figure(figsize=(8, 7))
-for data_source in ['SMAP', 'GLDAS']:
-    plt.plot(range(20), range(20),
-             color=color[data_source],
-             label=data_source)
-plt.legend(fontsize=16)
-fig.savefig(os.path.join(
-    output_plot_dir, 'legend.png'),
+            if show_xlabel['{}_{}'.format(v, i)] or plot_gldas is False:  # For paper formatting purpose
+                # Set xticks
+                ax2.set_xticks(xticks_to_show_ind)
+                # Replace the last tick
+                ax2.set_xticklabels(
+                    [i for i in xticks[xticks_to_show_ind][:-1]] + \
+                     [last_tick])
+                # xlabel
+                plt.xlabel('Aridity index (PET/P)', fontsize=20)
+            else:
+                ax2.get_xaxis().set_visible(False)
+            # xlim and ylim
+            plt.xlim([0, n_plot-1])
+            plt.ylim(ylim[i])
+            # labels
+            plt.ylabel(ylabel[i], fontsize=20)
+            ax2.tick_params(labelsize=16)
+            
+            # --- Add count subplot --- #
+            ax1 = plt.subplot(gs[0, 0])
+            ax1.bar(range(n_plot),
+                    dict_df_to_plot['SMAP']['count'],
+                    color='grey', width=0.8)
+            plt.xlim([0, n_plot-1])
+            ax1.tick_params(labelsize=16)
+            ax1.get_xaxis().set_visible(False)
+            
+            # --- Make plot look better --- #
+            fig.subplots_adjust(hspace=0.1)
+            
+            # Save figure
+            fig.savefig(
+                os.path.join(
+                    output_plot_dir,
+                    '{}.X_{}.coef_{}.png'.format(
+                        'SMAPvsGLDAS' if plot_gldas is True else 'SMAP',
+                        v, i+1)),
+                format='png', dpi=150,
+                bbox_inches='tight', pad_inches=0)
+            
+    # --- Get legend --- #
+    fig = plt.figure(figsize=(8, 7))
+    for data_source in ['SMAP', 'GLDAS']:
+        plt.plot(range(20), range(20),
+                 color=color[data_source],
+                 label=data_source)
+    plt.legend(fontsize=16)
+    fig.savefig(os.path.join(
+        output_plot_dir, 'legend.png'),
     format='png', dpi=150,
     bbox_inches='tight', pad_inches=0)
 
