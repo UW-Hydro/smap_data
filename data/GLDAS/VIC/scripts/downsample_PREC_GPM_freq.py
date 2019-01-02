@@ -17,7 +17,7 @@ from sklearn.neighbors import NearestNeighbors
 start_date = sys.argv[1]  # YYYYMMDD
 end_date = sys.argv[2]  # YYYYMMDD
 # 12H GPM nc - after quality control; used to subsample GLDAS PREC data
-gpm_12H_nc = '/civil/hydro/ymao/smap_data/tools/data_quality_control/output/data/prec.qc.20150401_20180331.nc'
+gpm_12H_nc = '/civil/hydro/ymao/smap_data/tools/data_quality_control/output/data/prec.qc_exclude_arid.20150401_20180331.nc'
 
 
 # ======================================================= #
@@ -108,9 +108,9 @@ da_prec_downsampled['lat'] = da_prec['lat']
 da_prec_downsampled['lon'] = da_prec['lon']
 
 # Save to file
-ds_prec_downsampled = xr.Dataset({'soil_moisture': da_prec_downsampled})
+ds_prec_downsampled = xr.Dataset({'PREC': da_prec_downsampled})
 ds_prec_downsampled.to_netcdf(os.path.join(
     output_agg_dir,
-    'prec.{}_{}.gpm_freq.nc'.format(
+    'prec.{}_{}.gpm_freq.exclude_arid.nc'.format(
         start_date, end_date)))
 
