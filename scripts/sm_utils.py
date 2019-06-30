@@ -204,9 +204,9 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
         Y.append(y)
         # Calculate x
         prec = prec_sum / dt  # [mm/hour]
-        if X_version == 'v1':
+        if X_version == 'v1' or X_version == 'v1_intercept':
             x = [sm_last, prec]
-        elif X_version == 'v2':
+        elif X_version == 'v2' or X_version == 'v2_intercept':
             x = [sm_last, prec, sm_last * prec]
         elif X_version == 'v3':
             x = [sm_last, prec, sm_last * prec, sm_last * sm_last]
@@ -274,7 +274,11 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     # --- Run regression --- #
     # Prepare regressor
     if regression_type == 'linear':
-        reg = linear_model.LinearRegression(fit_intercept=False)
+        if X_version == 'v1_intercept' or X_version == 'v2_intercept':
+            reg = linear_model.LinearRegression(fit_intercept=True)
+        else:
+            reg = linear_model.LinearRegression(fit_intercept=False)
+    # NOTE: the following did not incorporate intercept yet
     elif regression_type == 'lasso':
         reg = linear_model.Lasso(alpha=kwargs['alpha'],
                                  fit_intercept=False)

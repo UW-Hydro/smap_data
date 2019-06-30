@@ -150,6 +150,9 @@ da[:] = init
 for i in range(n_coef):
     da_init = da.copy(True)
     list_coef.append(da_init)
+# Fitted intercept, if applicable
+if X_version == 'v1_intercept' or X_version == 'v2_intercept':
+    da_intercept = da.copy(True)
 # R^2
 da_R2 = da.copy(True)
 # RMSE
@@ -161,6 +164,8 @@ for latlon_ind, item in dict_results.items():
     lon_ind = int(latlon_ind.split('_')[1])
     # Extract fitted coef
     fitted_coef = item['model'].coef_
+    if X_version == 'v1_intercept' or X_version == 'v2_intercept':
+        fitted_intercept = item['model'].intercept_
     # Extract R^2
     R2 = item['R2']
     # Extract RMSE
@@ -168,6 +173,8 @@ for latlon_ind, item in dict_results.items():
     # Put results into da
     for i in range(n_coef):
         list_coef[i][lat_ind, lon_ind] = fitted_coef[i]
+    if X_version == 'v1_intercept' or X_version == 'v2_intercept':
+        da_intercept[lat_ind, lon_ind] = fitted_intercept
     da_R2[lat_ind, lon_ind] = R2
     da_RMSE[lat_ind, lon_ind] = RMSE
 
@@ -177,6 +184,11 @@ for i in range(n_coef):
     ds = xr.Dataset({'coef': list_coef[i]})
     ds.to_netcdf(os.path.join(output_data_dir,
                               '{}fitted_coef.{}.nc'.format(file_basename, i+1)),
+                 format='NETCDF4_CLASSIC')
+if X_version == 'v1_intercept' or X_version == 'v2_intercept':
+    ds = xr.Dataset({'intercept': da_intercept})
+    ds.to_netcdf(os.path.join(output_data_dir,
+                              '{}fitted_intercept.{}.nc'.format(file_basename, i+1)),
                  format='NETCDF4_CLASSIC')
 # R2
 ds_R2 = xr.Dataset({'R2': da_R2})
