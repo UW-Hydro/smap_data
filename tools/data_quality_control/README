@@ -1,6 +1,6 @@
 Data quality control steps:
 
-# --- SMAP quality control --- #
+# --- SMAP quality control - Basic --- #
 1. exclude_constant_SMAP.py
     - Exclude constant-value SMAP pixels
 
@@ -19,4 +19,3 @@ Data quality control steps:
     2) Exclude pixels where >= 30% of the IMERG timesteps are NAN
     3) Exclude pixels where < 10% of the IMERG timesteps are nonzero
        (this criteria mainly excludes eastern Sahara and part of Arabian Penninsular, but not much other areas)
-

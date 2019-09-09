@@ -66,9 +66,9 @@ file_basename = 'X_{}.{}.{}.{}'.format(
 result_pickle = 'results.{}pickle'.format(file_basename)
 
 # Determine n_coef
-if X_version == 'v1':
+if X_version == 'v1' or X_version == 'v1_intercept':
     n_coef = 2
-elif X_version == 'v2':
+elif X_version == 'v2' or X_version == 'v2_intercept':
     n_coef = 3
 elif X_version == 'v3':
     n_coef = 4

@@ -67,9 +67,9 @@ file_basename = 'X_{}.{}.{}.{}'.format(
 result_pickle = 'results.{}pickle'.format(file_basename)
 
 # Determine n_coef
-if X_version == 'v1':
+if X_version == 'v1' or X_version == 'v1_intercept':
     n_coef = 2
-elif X_version == 'v2':
+elif X_version == 'v2' or X_version == 'v2_intercept':
     n_coef = 3
 elif X_version == 'v3':
     n_coef = 4
@@ -91,6 +91,13 @@ for i in range(n_coef):
     da_coef.load()
     da_coef.close()
     list_coef.append(da_coef)
+# Intercept
+if X_version == 'v1_intercept' or X_version == 'v2_intercept':
+    da_intercept = xr.open_dataset(
+        os.path.join(output_data_dir,
+        '{}fitted_intercept.nc'.format(file_basename)))['intercept']
+    da_intercept.load()
+    da_intercept.close()
 # R2
 da_R2 = xr.open_dataset(os.path.join(
     output_data_dir,
@@ -283,7 +290,7 @@ cs = tau.where(da_domain==1).plot.pcolormesh(
     add_colorbar=False,
     add_labels=False,
     cmap='Spectral',
-    vmin=0, vmax=40,
+    vmin=0, vmax=20,
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='both')
 cbar.set_label(r'${\tau}$ ' + '(day)', fontsize=20)
@@ -292,9 +299,9 @@ cbar.set_label(r'${\tau}$ ' + '(day)', fontsize=20)
 a = plt.axes([0.17, 0.3, 0.12, 0.2])
 data_all = tau.values.flatten()
 data_all = data_all[~np.isnan(data_all)]
-cs = plt.hist(data_all, bins=20, range=(0, 100),
+cs = plt.hist(data_all, bins=20, range=(0, 30),
               density=True, color='gray')
-plt.ylim([0, 0.06])
+plt.ylim([0, 0.3])
 plt.xlabel(r'${\tau}$ ' + '(day)', fontsize=14)
 plt.title('PDF', fontsize=14)
 # Save fig
@@ -309,6 +316,13 @@ fig.savefig(
 # beta2 * depth [mm] - fraction of P flux that is added to the top 5cm soil
 # (if P*SM presents, this interpretation is for when SM=0)
 P_frac = list_coef[1] * cfg['PLOT']['soil_depth']  # convert from [mm-1] to [-]
+# Set up label
+if X_version[:2] == 'v1':
+    label = r'${\beta}_2$ ' + '(-)'
+elif X_version[:2] == 'v2':
+    label = r'${\gamma}_2$ ' + '(-)'
+
+# Plot
 fig = plt.figure(figsize=(12, 5))
 # Set projection
 ax = plt.axes(projection=ccrs.PlateCarree())
@@ -326,7 +340,7 @@ cs = P_frac.where(da_domain==1).plot.pcolormesh(
     vmin=0, vmax=1,
     transform=ccrs.PlateCarree())
 cbar = plt.colorbar(cs, extend='both')
-cbar.set_label(r'${\beta}_2$ ' + '(-)', fontsize=20)
+cbar.set_label(label, fontsize=20)
 #plt.title('Fraction of P flux reflected in the surface-layer SM\n'
 #          '(if P*SM presents, this interpretation is for when SM=0)',
 #          fontsize=20)
@@ -334,10 +348,10 @@ cbar.set_label(r'${\beta}_2$ ' + '(-)', fontsize=20)
 a = plt.axes([0.16, 0.3, 0.12, 0.2])
 data_all = P_frac.values.flatten()
 data_all = data_all[~np.isnan(data_all)]
-cs = plt.hist(data_all, bins=20, range=(0, 1),
+cs = plt.hist(data_all, bins=20, range=(0, 1.5),
               density=True, color='gray')
 plt.ylim([0, 4])
-plt.xlabel(r'${\beta}_2$ ' + '(-)', fontsize=14)
+plt.xlabel(label, fontsize=14)
 plt.title('PDF', fontsize=14)
 # Save fig
 fig.savefig(
@@ -350,7 +364,7 @@ fig.savefig(
 # --- Interpretation of beta 3 (SM*P) --- #
 # beta3 - how much P_frac changes with SM level
 # only for X_v2 or X_v3
-if X_version == 'v2' or X_version == 'v3':
+if X_version == 'v2' or X_version == 'v2_intercept':
     P_frac_with_SM = list_coef[2]  # convert from [-/mm]
     fig = plt.figure(figsize=(12, 5))
     # Set projection
@@ -391,3 +405,41 @@ if X_version == 'v2' or X_version == 'v3':
         format='png', bbox_inches='tight', pad_inches=0)
 
 
+# --- Interpretation of beta 0 (intercept) --- #
+if X_version == 'v1_intercept' or X_version == 'v2_intercept':
+    # SM0 = -beta0/beta1 - fitted lowest SM0
+    sm0 = - da_intercept / list_coef[0]  # [-]
+    fig = plt.figure(figsize=(12, 5))
+    # Set projection
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.set_extent([-180, 180, -85, 85], ccrs.Geodetic())
+    gl = add_gridlines(ax, alpha=0)
+    ax.add_feature(cartopy.feature.LAND,
+                   facecolor=[1, 1, 1],
+                   edgecolor=[0.5, 0.5, 0.5], linewidth=0.3)
+    # Plot
+    cs = sm0.where(da_domain==1).plot.pcolormesh(
+        'lon', 'lat', ax=ax,
+        add_colorbar=False,
+        add_labels=False,
+        cmap='Spectral',
+        vmin=0, vmax=0.5,
+        transform=ccrs.PlateCarree())
+    cbar = plt.colorbar(cs, extend='both')
+    cbar.set_label(r'${SSM_0}$ ' + r'$(mm^{3}/mm^{3})$', fontsize=20)
+    #plt.title('SM exponential decay e-folding time scale', fontsize=20)
+    # Insert pdf plot
+    a = plt.axes([0.17, 0.3, 0.12, 0.2])
+    data_all = sm0.values.flatten()
+    data_all = data_all[~np.isnan(data_all)]
+    cs = plt.hist(data_all, bins=20, range=(0, 0.5),
+                  density=True, color='gray')
+    plt.ylim([0, 10])
+    plt.xlabel(r'${SSM_0}$ ' + r'$(mm^{3}/mm^{3})$', fontsize=14)
+    plt.title('PDF', fontsize=14)
+    # Save fig
+    fig.savefig(
+        os.path.join(
+            output_plot_dir,
+            '{}.sm0.png'.format(file_basename, i+1)),
+        format='png', bbox_inches='tight', pad_inches=0)

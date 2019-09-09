@@ -68,6 +68,17 @@ prec = da_gpm.values
 prec[:, da_missing_fraction>=0.3] = np.nan
 da_gpm[:] = prec
 
+# --- Save intermediate data to file --- #
+ds_gpm_inter = xr.Dataset({'PREC': da_gpm})
+ds_gpm_inter.to_netcdf(
+    os.path.join(output_dir,
+                 'prec.qc_exclude_arid.inter.{}_{}.nc'.format(
+                    start_time.strftime('%Y%m%d'),
+                    end_time.strftime('%Y%m%d'))),
+    format='NETCDF4_CLASSIC')
+
+exit()
+
 
 # ========================================== #
 # Exclude pixels where < 10% of the IMERG timesteps are nonzero

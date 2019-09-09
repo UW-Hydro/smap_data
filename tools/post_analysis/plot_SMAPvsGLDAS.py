@@ -170,7 +170,7 @@ dict_da_aridity = {'GLDAS': da_aridity,
 soil_depth = {'SMAP': 50,
               'GLDAS': 100}
 # ylim for each coef
-ylim = {0: [0, 100],
+ylim = {0: [0, 30],
         1: [0, 1.0],
         2: [-0.2, 0.02]}
 # ylabel for each coef

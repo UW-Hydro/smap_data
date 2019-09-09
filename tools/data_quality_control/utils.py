@@ -257,3 +257,66 @@ def add_gridlines(axis,
     gl.xformatter = LONGITUDE_FORMATTER
     gl.yformatter = LATITUDE_FORMATTER
     return gl
+
+
+def construct_regression_input_time_series(
+    lat_ind, lon_ind, ts_smap, ts_prec):
+    ''' Construct regression input for time series of SMAP and GPM data for one pixel
+        (for quality control purpose)
+
+    Parameters
+    ----------
+    lat_ind: <ind>
+        zero-starting lat index - for printing purpose only
+    lon_ind: <ind>
+        zero-starting lon index - for printing purpose only
+    ts_smap: <pd.Series>
+        SMAP time series (with NAN)
+    ts_prec: <pd.Series>
+        IMERG precipitation time series
+    '''
+
+    # --- Put SMAP and prec into a df --- #
+    ts_prec = ts_prec.truncate(before=ts_smap.index[0],
+                               after=ts_smap.index[-1])
+    ts_smap = ts_smap.truncate(before=ts_prec.index[0],
+                               after=ts_prec.index[-1])
+    df = pd.concat([ts_smap, ts_prec], axis=1,
+                   keys=['sm', 'prec'])
+    
+    # --- Construct X and Y for regression --- #
+    # X: SM(k-1), sum(P), sum(P)*SM(k-1)
+    # Y: SM(k) - SM(k-1)
+
+    # Find all time indices with SMAP observations
+    smap_ind = np.argwhere(~np.isnan(df['sm']))[:, 0]
+    # Construct X and Y matrices
+    X = []
+    Y = []
+    times = []
+
+    # Start from the second SMAP obs
+    for i in range(1, len(smap_ind)):
+        # --- If there the SMAP data gap is too big, skip calculation --- #
+        # (Right now set the limit to 5 days)
+        if smap_ind[i] - smap_ind[i-1] > 10:
+            continue
+        # --- Discard this timestep if precipitation data contains NAN
+        s_prec_step = df['prec'].iloc[smap_ind[i-1]:smap_ind[i]]
+        if s_prec_step.isnull().any():  # Discard timesteps with NAN precipitation data
+            continue
+        # Calculate cumulative precipitation (NOTE: prec is time-beginning timestamp
+        prec_sum = s_prec_step.sum()  # [mm]
+
+        # --- Calculate Y and X elements --- #
+        dt = (smap_ind[i] - smap_ind[i-1]) * 12  # delta t [hour]
+        # Calculate y
+        sm = df.iloc[smap_ind[i], :]['sm']
+        sm_last = df.iloc[smap_ind[i-1], :]['sm']
+        y = (sm - sm_last) / dt  # [mm/hour]
+        Y.append(y)
+
+
+
+
+

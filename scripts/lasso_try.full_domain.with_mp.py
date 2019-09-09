@@ -106,8 +106,13 @@ results = Parallel(n_jobs=nproc)(delayed(regression_time_series_chunk_wrap)(
 
 # --- Merge the dict_results of all chunks together --- #
 dict_results = {}
-for d in results:
-    dict_results.update(d)
+dict_discards = {"TooFew": {},
+                 "PnotY": {},
+                 "V2Corr": {}}
+for d_result, d_discard in results:
+    dict_results.update(d_result)
+    for discard in ["TooFew", "PnotY", "V2Corr"]:
+        dict_discards[discard].update(d_discard[discard])
 
 
 # ========================================= #
@@ -123,6 +128,10 @@ file_basename = 'X_{}.{}.{}.{}'.format(
 
 with open(os.path.join(output_data_dir, '{}pickle'.format(file_basename)), 'wb') as f:
     pickle.dump(dict_results, f)
+
+# --- Save discard dict --- #
+with open(os.path.join(output_data_dir, '{}discard.pickle'.format(file_basename)), 'wb') as f:
+    pickle.dump(dict_discards, f)
 
 # --- Extract n_coef --- #
 for latlon_ind, item in dict_results.items():
@@ -153,6 +162,10 @@ for i in range(n_coef):
 # Fitted intercept, if applicable
 if X_version == 'v1_intercept' or X_version == 'v2_intercept':
     da_intercept = da.copy(True)
+# Discarded
+dict_da_discard = {}
+for discard in ["TooFew", "PnotY", "V2Corr"]:
+    dict_da_discard[discard] = da.copy(True)
 # R^2
 da_R2 = da.copy(True)
 # RMSE
@@ -178,6 +191,13 @@ for latlon_ind, item in dict_results.items():
     da_R2[lat_ind, lon_ind] = R2
     da_RMSE[lat_ind, lon_ind] = RMSE
 
+# --- Extract discarded pixels --- #
+for discard in ["TooFew", "PnotY", "V2Corr"]:
+    for latlon_ind, item in dict_discards[discard].items():
+        lat_ind = int(latlon_ind.split('_')[0])
+        lon_ind = int(latlon_ind.split('_')[1])
+        dict_da_discard[discard][lat_ind, lon_ind] = 1
+
 # --- Save to netCDF --- #
 # coefficients
 for i in range(n_coef):
@@ -188,17 +208,23 @@ for i in range(n_coef):
 if X_version == 'v1_intercept' or X_version == 'v2_intercept':
     ds = xr.Dataset({'intercept': da_intercept})
     ds.to_netcdf(os.path.join(output_data_dir,
-                              '{}fitted_intercept.{}.nc'.format(file_basename, i+1)),
+                              '{}fitted_intercept.nc'.format(file_basename)),
                  format='NETCDF4_CLASSIC')
 # R2
 ds_R2 = xr.Dataset({'R2': da_R2})
 ds_R2.to_netcdf(os.path.join(output_data_dir,
-                            '{}R2.nc'.format(file_basename, i+1)),
+                            '{}R2.nc'.format(file_basename)),
                 format='NETCDF4_CLASSIC')
 
 # RMSE
 ds_RMSE = xr.Dataset({'RMSE': da_RMSE})
 ds_RMSE.to_netcdf(os.path.join(output_data_dir,
-                               '{}RMSE.nc'.format(file_basename, i+1)),
+                               '{}RMSE.nc'.format(file_basename)),
                   format='NETCDF4_CLASSIC')
+# Discarded
+for discard in ["TooFew", "PnotY", "V2Corr"]:
+    ds = xr.Dataset({discard: dict_da_discard[discard]})
+    ds.to_netcdf(os.path.join(output_data_dir,
+                              '{}discarded_{}.nc'.format(file_basename, discard)),
+                 format='NETCDF4_CLASSIC')
 

@@ -107,14 +107,24 @@ def regression_time_series_chunk_wrap(lon_ind_start, lon_ind_end,
     # Reorganize chunk results into dict - {latind_lonind: dict_results}
     # Only save not-None pixels
     dict_results_chunk = {}
+    dict_discarded_chunk = {"TooFew": {},
+                            "PnotY": {},
+                            "V2Corr": {}}  # {discard_reason: {lat_lon: 1}}
     for lat_ind in range(len(da_domain_chunk['lat'])):
         for lon_ind in range(len(da_domain_chunk['lon'])):
             result = results_list.pop(0)
-            if result is not None:
-                lon_ind_whole_domain = lon_ind_start + lon_ind
+            lon_ind_whole_domain = lon_ind_start + lon_ind
+            # If None (pixel not run), skip
+            if result is None:
+                continue
+            # If result is string, this pixel is discarded; record reason
+            elif isinstance(result, str):
+                dict_discarded_chunk[result]['{}_{}'.format(lat_ind, lon_ind_whole_domain)] = 1
+            # Else, this pixel is fitted
+            else:
                 dict_results_chunk['{}_{}'.format(lat_ind, lon_ind_whole_domain)] = result
 
-    return dict_results_chunk
+    return dict_results_chunk, dict_discarded_chunk
 
 
 def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
@@ -224,7 +234,7 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     # --- If there are <= 100 data points, discard this cell --- #
     if len(Y) <= 100:
         print('Too few valid data points for pixel {} {} - discard!'.format(lat_ind, lon_ind))
-        return None
+        return "TooFew"
 
     # --- Quality control for precipitation data --- #
     # NOTE: assume the second column in X is precipitation!!!
@@ -239,22 +249,25 @@ def regression_time_series(lat_ind, lon_ind, ts_smap, ts_prec,
     # Critical t (H0: r=0; H1: r>0. One-sided; alpha=0.1)
     t_critical = scipy.stats.t.ppf(0.9, df=n-2)
     if t < t_critical:  # zero r
-        print('Precipitation not positively correlated with Y for pixel {} {} - drop precipitation term(s)'.format(
+        print('Precipitation not positively correlated with Y for pixel {} {} - discard this pixel'.format(
             lat_ind, lon_ind))
-        if X_version == 'v1':
-            list_deleted_columns.append(1)
-        elif X_version == 'v2':
-            list_deleted_columns.append(1)
-            list_deleted_columns.append(2)
-    # 2) If two variables in X are hightly correlated, drop the latter
-    for i in range(n_coef-1):
-        for j in range(i+1, n_coef):
-            if(np.corrcoef(X[:, i], X[:, j])[0, 1] >= 0.98):
-                print(('Variables {} and {} have correlation coefficient '
-                       '>= 0.98 for pixel {} {} - drop the latter variable').format(
-                            i+1, j+1, lat_ind, lon_ind))
+        return "PnotY"
+#        if X_version == 'v1':
+#            list_deleted_columns.append(1)
+#        elif X_version == 'v2':
+#            list_deleted_columns.append(1)
+#            list_deleted_columns.append(2)
+    # 2) If X_version = v2 and P and SM*P columns are highly correlated, discard this pixel for this v2 run
+    if X_version == 'v2' or X_version == 'v2_intercept':
+#    for i in range(n_coef-1):
+#        for j in range(i+1, n_coef):
+        if(np.corrcoef(X[:, 1], X[:, 2])[0, 1] >= 0.99):
+            print(('X_version v2 with P and SM*P columns have correlation coefficient '
+                   '>= 0.99 for pixel {} {} - drop this pixel for v2').format(
+                        lat_ind, lon_ind))
+            return "V2Corr"
                 # Record the second column to be deleted
-                list_deleted_columns.append(j)
+                #list_deleted_columns.append(j)
     # Drop columns
     if len(list_deleted_columns) > 0:
         X = np.delete(X, list_deleted_columns, axis=1)
